@@ -16,4 +16,3 @@ if __name__ == "__main__":
             print '\t'.join(inp)
         except:
             break
-

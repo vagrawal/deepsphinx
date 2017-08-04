@@ -6,17 +6,20 @@ import numpy as np
 from vocab import vocab_to_int, vocab_size
 from utils import FileOpen
 
+
 def in_fst(f, text):
     st = [0]
     probs = [0.0]
     num_st = 1
     ret = True
     sc = 0.0
-    st, probs, num_st, vocab_probs = fstCostSingle(st, probs, num_st, vocab_to_int['<s>'], f, 5)
+    st, probs, num_st, vocab_probs = fstCostSingle(
+        st, probs, num_st, vocab_to_int['<s>'], f, 5)
     vocab_probs -= combine(vocab_probs)
     for i in text:
         sc += vocab_probs[i]
-        st, probs, num_st, vocab_probs = fstCostSingle(st, probs, num_st, i, f, 5)
+        st, probs, num_st, vocab_probs = fstCostSingle(
+            st, probs, num_st, i, f, 5)
         vocab_probs -= combine(vocab_probs)
         if (num_st == 0):
             ret = False
@@ -32,6 +35,7 @@ def dfsProbs(state, prob, LMfst, probsArr):
             continue
         probsArr[arc.ilabel].append(curProb)
 
+
 def dfsFind(state, prob, LMfst, inp, out):
     for arc in LMfst.arcs(state):
         curProb = prob - np.log(10) * np.float32(arc.weight.to_string())
@@ -41,11 +45,13 @@ def dfsFind(state, prob, LMfst, inp, out):
         if arc.ilabel == inp:
             out.append((arc.nextstate, curProb))
 
+
 def combine(probs):
     if (len(probs) == 0):
         return np.float32(-50.0)
     probs_max = np.max(probs)
     return probs_max + np.log(np.sum(np.exp(probs - probs_max)))
+
 
 def fstCostSingle(poss_states, probs, num_fst_states, inp, LMfst, max_states):
     # A very crude try
@@ -74,6 +80,7 @@ def fstCostSingle(poss_states, probs, num_fst_states, inp, LMfst, max_states):
         next_probs.append(0)
     return np.asarray(next_states), np.asarray(next_probs), num_states, np.asarray(probsArr)
 
+
 def fstCosts(states, state_probs, num_fst_states, inputs, LMfst, max_states):
     next_states = np.zeros_like(states)
     next_state_probs = np.zeros_like(state_probs)
@@ -81,5 +88,5 @@ def fstCosts(states, state_probs, num_fst_states, inputs, LMfst, max_states):
     scores = np.zeros((num_fst_states.shape[0], vocab_size), 'float32')
     for i in range(num_fst_states.shape[0]):
         next_states[i], next_state_probs[i], next_num_states[i][0], scores[i] = fstCostSingle(states[i],
-                state_probs[i], num_fst_states[i][0], inputs[i], LMfst, max_states)
+                                                                                              state_probs[i], num_fst_states[i][0], inputs[i], LMfst, max_states)
     return next_states, next_state_probs, next_num_states, scores

@@ -14,10 +14,11 @@ from fst import fstCosts
 from utils import FileOpen, wer
 import pywrapfst as fst
 
+
 def run_eval(graph, job_dir, checkpoint, queue, predictions, data_dir, nfilt,
-        outputs, output_lengths,
-        step, cost, keep_prob_tensor, mean_speaker, var_speaker,
-        best_n_inference, pred_scores, LMfst):
+             outputs, output_lengths,
+             step, cost, keep_prob_tensor, mean_speaker, var_speaker,
+             best_n_inference, pred_scores, LMfst):
 
     tf.logging.info("Evaluation started")
     with graph.as_default():
@@ -26,22 +27,22 @@ def run_eval(graph, job_dir, checkpoint, queue, predictions, data_dir, nfilt,
         with tf.Session() as sess:
             tf.train.Saver().restore(sess, checkpoint)
             read_data_queue('si_et_05', queue, data_dir, nfilt,
-                    sess, mean_speaker, var_speaker, LMfst)
+                            sess, mean_speaker, var_speaker, LMfst)
             tot_wer = 0.0
             tot_cer = 0.0
             batch_loss = 0.0
             tot_ev = 0
             tot_bat = 0
             coord = tf.train.Coordinator(
-                    clean_stop_exception_types=(
-                        tf.errors.CancelledError,
-                        tf.errors.OutOfRangeError))
+                clean_stop_exception_types=(
+                    tf.errors.CancelledError,
+                    tf.errors.OutOfRangeError))
 
             with coord.stop_on_exception():
                 while not coord.should_stop():
                     pred, sc, out, out_len, loss = sess.run(
-                            [predictions, pred_scores, outputs, output_lengths, cost],
-                            feed_dict={keep_prob_tensor: 1.0})
+                        [predictions, pred_scores, outputs, output_lengths, cost],
+                        feed_dict={keep_prob_tensor: 1.0})
                     tot_ev += pred.shape[0]
                     tot_bat += 1
                     batch_loss += loss
@@ -49,26 +50,32 @@ def run_eval(graph, job_dir, checkpoint, queue, predictions, data_dir, nfilt,
                         best_wer = 100.0
                         best_cer = 100.0
                         for j in range(best_n_inference):
-                            real_out = ''.join([vocab[l] for l in out[i, :out_len[i] - 1]])
-                            pred_out = ''.join([vocab[l] for l in pred[i, :, j]])
+                            real_out = ''.join([vocab[l]
+                                                for l in out[i, :out_len[i] - 1]])
+                            pred_out = ''.join([vocab[l]
+                                                for l in pred[i, :, j]])
                             pred_out = pred_out.split('<')[0]
                             cur_wer = wer(real_out.split(), pred_out.split())
                             # tf.logging.info("{} : {}".format(pred_out, sc[i, j]))
                             best_wer = min(best_wer, cur_wer)
-                            best_cer = min(best_cer, wer(list(real_out), list(pred_out)))
+                            best_cer = min(best_cer, wer(
+                                list(real_out), list(pred_out)))
                         tot_wer += best_wer
                         tot_cer += best_cer
 
-            tf.logging.info('WER: {}, CER: {}'.format(tot_wer / tot_ev, tot_cer / tot_ev))
-            summary = tf.Summary(value=
-                [tf.Summary.Value(tag="WER_valid", simple_value=tot_wer / tot_ev),
-                 tf.Summary.Value(tag="CER_valid", simple_value=tot_cer / tot_ev),
-                 tf.Summary.Value(tag="loss_valid", simple_value=batch_loss / tot_bat)
-                ])
+            tf.logging.info('WER: {}, CER: {}'.format(
+                tot_wer / tot_ev, tot_cer / tot_ev))
+            summary = tf.Summary(value=[tf.Summary.Value(tag="WER_valid", simple_value=tot_wer / tot_ev),
+                                        tf.Summary.Value(
+                tag="CER_valid", simple_value=tot_cer / tot_ev),
+                tf.Summary.Value(tag="loss_valid",
+                                 simple_value=batch_loss / tot_bat)
+            ])
             writer.add_summary(summary, global_step=sess.run(step))
             writer.flush()
             coord.request_stop()
     tf.logging.info("Evaluation finished")
+
 
 def train(
         nfilt,
@@ -102,11 +109,11 @@ def train(
     graph = tf.Graph()
     with graph.as_default():
         learning_rate_tensor = tf.placeholder(
-                tf.float32,
-                name='learning_rate')
+            tf.float32,
+            name='learning_rate')
         keep_prob_tensor = tf.placeholder(
-                tf.float32,
-                name='keep_prob')
+            tf.float32,
+            name='keep_prob')
         # https://stackoverflow.com/questions/39204335/can-a-tensorflow-queue-be-reopened-after-it-is-closed
         with tf.container('queue'):
             queue = tf.PaddingFIFOQueue(
@@ -114,21 +121,22 @@ def train(
                 dtypes=['float32', 'int32', 'int32', 'int32'],
                 shapes=[[None, nfilt * 3 + 1], [], [None], []],
                 name='feed_queue')
-            inputs, input_lengths, outputs, output_lengths = queue.dequeue_many(batch_size)
+            inputs, input_lengths, outputs, output_lengths = queue.dequeue_many(
+                batch_size)
 
         training_logits, predictions, train_op, cost, step, pred_scores = seq2seq_model(
-                inputs,
-                outputs,
-                keep_prob_tensor,
-                input_lengths,
-                output_lengths,
-                max_output_len,
-                rnn_size,
-                num_layers,
-                tf.shape(input_lengths)[0],
-                beam_width,
-                learning_rate_tensor,
-                LMfst)
+            inputs,
+            outputs,
+            keep_prob_tensor,
+            input_lengths,
+            output_lengths,
+            max_output_len,
+            rnn_size,
+            num_layers,
+            tf.shape(input_lengths)[0],
+            beam_width,
+            learning_rate_tensor,
+            LMfst)
 
         writer = tf.summary.FileWriter(job_dir)
         saver = tf.train.Saver()
@@ -144,19 +152,19 @@ def train(
             # Don't waste time on evaluation for high WERs in training
             if (checkpoint_path is not None and last_wer < 20.0):
                 run_eval(graph, job_dir, checkpoint_path, queue, predictions, data_dir,
-                        nfilt, outputs,
-                        output_lengths, step, cost, keep_prob_tensor,
-                        mean_speaker, var_speaker, best_n_inference,
-                        pred_scores, LMfst)
+                         nfilt, outputs,
+                         output_lengths, step, cost, keep_prob_tensor,
+                         mean_speaker, var_speaker, best_n_inference,
+                         pred_scores, LMfst)
                 if (eval_only):
                     coord.request_stop()
                     return
             tf.Session.reset(None, ['queue'])
             with tf.Session() as sess:
                 coord = tf.train.Coordinator(
-                        clean_stop_exception_types=(
-                            tf.errors.CancelledError,
-                            tf.errors.OutOfRangeError))
+                    clean_stop_exception_types=(
+                        tf.errors.CancelledError,
+                        tf.errors.OutOfRangeError))
                 if (checkpoint_path is None):
                     sess.run(tf.global_variables_initializer())
                     sess.run(tf.local_variables_initializer())
@@ -164,16 +172,16 @@ def train(
                     saver.restore(sess, checkpoint_path)
 
                 read_data_queue('si_tr_s', queue, data_dir, nfilt,
-                        sess, mean_speaker, var_speaker, LMfst)
+                                sess, mean_speaker, var_speaker, LMfst)
 
                 with coord.stop_on_exception():
                     while not coord.should_stop():
                         start_time = time.time()
 
                         loss, _, batch_i = sess.run(
-                                [cost, train_op, step],
-                                feed_dict={learning_rate_tensor: learning_rate,
-                                    keep_prob_tensor: keep_prob})
+                            [cost, train_op, step],
+                            feed_dict={learning_rate_tensor: learning_rate,
+                                       keep_prob_tensor: keep_prob})
 
                         batch_loss += loss
                         end_time = time.time()
@@ -181,31 +189,38 @@ def train(
 
                         if batch_i % display_step == 0 and batch_i > 0:
                             tf.logging.info('Epoch {:>3}/{} Batch {:>4} - Loss: {:>6.3f}, Seconds: {:>4.2f}'
-                                  .format(epoch_i,
-                                          num_epochs,
-                                          batch_i,
-                                          batch_loss / display_step,
-                                          batch_time))
+                                            .format(epoch_i,
+                                                    num_epochs,
+                                                    batch_i,
+                                                    batch_loss / display_step,
+                                                    batch_time))
                             tot_wer = 0.0
                             tot_cer = 0.0
 
                             pred, out, out_len = sess.run(
-                                    [predictions, outputs, output_lengths],
-                                    feed_dict={keep_prob_tensor: 1.0})
+                                [predictions, outputs, output_lengths],
+                                feed_dict={keep_prob_tensor: 1.0})
                             for i in range(pred.shape[0]):
-                                real_out = ''.join([vocab[l] for l in out[i, :out_len[i] - 1]])
-                                pred_out = ''.join([vocab[l] for l in pred[i, :, 0]])
+                                real_out = ''.join(
+                                    [vocab[l] for l in out[i, :out_len[i] - 1]])
+                                pred_out = ''.join([vocab[l]
+                                                    for l in pred[i, :, 0]])
                                 pred_out = pred_out.split('<')[0]
-                                tot_wer += wer(real_out.split(), pred_out.split())
+                                tot_wer += wer(real_out.split(),
+                                               pred_out.split())
                                 tot_cer += wer(list(real_out), list(pred_out))
-                            tf.logging.info('Sample real output: {}'.format(real_out))
-                            tf.logging.info('Sample predicted output: {}'.format(pred_out))
-                            tf.logging.info('WER: {}, CER: {}'.format(tot_wer / pred.shape[0], tot_cer / pred.shape[0]))
-                            summary = tf.Summary(value=
-                                [tf.Summary.Value(tag="WER", simple_value=tot_wer / pred.shape[0]),
-                                 tf.Summary.Value(tag="CER", simple_value=tot_cer / pred.shape[0]),
-                                 tf.Summary.Value(tag="loss", simple_value=batch_loss / display_step)
-                                ])
+                            tf.logging.info(
+                                'Sample real output: {}'.format(real_out))
+                            tf.logging.info(
+                                'Sample predicted output: {}'.format(pred_out))
+                            tf.logging.info('WER: {}, CER: {}'.format(
+                                tot_wer / pred.shape[0], tot_cer / pred.shape[0]))
+                            summary = tf.Summary(value=[tf.Summary.Value(tag="WER", simple_value=tot_wer / pred.shape[0]),
+                                                        tf.Summary.Value(
+                                tag="CER", simple_value=tot_cer / pred.shape[0]),
+                                tf.Summary.Value(
+                                tag="loss", simple_value=batch_loss / display_step)
+                            ])
                             last_wer = tot_wer / pred.shape[0]
                             writer.add_summary(summary, global_step=batch_i)
                             writer.flush()
@@ -218,9 +233,10 @@ def train(
 
                 tf.logging.info("Epoch completed, saving")
                 checkpoint_path = saver.save(
-                        sess, checkpoint, step)
+                    sess, checkpoint, step)
 
                 coord.request_stop()
+
 
 if __name__ == "__main__":
     tf.logging.set_verbosity(tf.logging.INFO)
@@ -236,7 +252,8 @@ if __name__ == "__main__":
     parser.add_argument("--beam-width", default=8, type=int)
     parser.add_argument("--learning-rate-decay", default=0.9998, type=float)
     parser.add_argument("--min-learning-rate", default=0.0002, type=float)
-    parser.add_argument("--display-step", default=20, type=int) # Check training loss after every display_step batches
+    # Check training loss after every display_step batches
+    parser.add_argument("--display-step", default=20, type=int)
     parser.add_argument("--data-dir", default='gs://wsj-data/wsj0/')
     parser.add_argument("--job-dir", default='./job/')
     parser.add_argument("--checkpoint-path", default=None)
