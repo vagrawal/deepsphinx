@@ -2,8 +2,9 @@
 import tensorflow as tf
 from tensorflow.python.layers.core import Dense
 from tensorflow.python.ops.rnn_cell_impl import _zero_state_tensors
+from deepsphinx.utils import FLAGS
 
-
+# pylint: disable=too-few-public-methods
 class BahdanauAttentionCutoff(tf.contrib.seq2seq.BahdanauAttention.__base__):
     """Implements Bhadanau-style (additive) attention.
     This attention has two forms.  The first is Bhandanau attention,
@@ -47,15 +48,21 @@ class BahdanauAttentionCutoff(tf.contrib.seq2seq.BahdanauAttention.__base__):
           name: Name to use when creating ops.
         """
         def probability_fn_cutoff(scores, previous_alignments):
+            """Only allow characters near previous alignments means and make all
+            zero"""
             ran = tf.range(tf.to_float(
                 tf.shape(previous_alignments)[1]), dtype=tf.float32)
-            mean = tf.reduce_sum(ran * previous_alignments, axis=1) / \
-                tf.reduce_sum(previous_alignments, axis=1)
-            mask = tf.logical_and(ran > mean - 100, ran < mean + 100)
+            mean = (tf.reduce_sum(ran * previous_alignments, axis=1) /
+                    tf.reduce_sum(previous_alignments, axis=1))
+            mask = tf.logical_and(
+                ran > mean - FLAGS.cutoff_range,
+                ran < mean + FLAGS.cutoff_range)
             return tf.nn.softmax(tf.where(mask, scores, tf.ones_like(scores) * -1000))
         probability_fn = tf.nn.softmax
 
-        def probability_fn_cutoff(score, _): return probability_fn(score)
+        def probability_fn_cutoff(score, _):
+            return probability_fn(score)
+
         super(BahdanauAttentionCutoff, self).__init__(
             query_layer=Dense(
                 num_units, name="query_layer", use_bias=False),
@@ -116,6 +123,7 @@ class BahdanauAttentionCutoff(tf.contrib.seq2seq.BahdanauAttention.__base__):
         return alignments
 
     def initial_alignments(self, batch_size, dtype):
+        """Returns all the alignment saturated in first block"""
         max_time = self._alignments_size
         alignments = _zero_state_tensors(max_time - 1, batch_size, dtype)
         return tf.concat([tf.fill([batch_size, 1], 1.0), alignments], 1)

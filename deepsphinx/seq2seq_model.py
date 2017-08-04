@@ -1,35 +1,43 @@
+"""Tensorflow model for speech recognition"""
 import tensorflow as tf
-from vocab import vocab, vocab_to_int, vocab_size
-from lm import LMCellWrapper
-from attention import BahdanauAttentionCutoff
-
+from deepsphinx.vocab import VOCAB_SIZE, VOCAB_TO_INT
+from deepsphinx.utils import FLAGS
+from deepsphinx.lm import LMCellWrapper
+from deepsphinx.attention import BahdanauAttentionCutoff
 
 def encoding_layer(
-        rnn_size,
         input_lengths,
-        num_layers,
-        rnn_inputs,
-        keep_prob):
-    for layer in range(num_layers):
+        rnn_inputs):
+    """ Encoding layer for the model.
+
+    Args:
+        input_lengths (Tensor): A tensor of input lenghts of instances in
+            batches
+        rnn_inputs (Tensor): Inputs
+
+    Returns:
+        Encoding output, LSTM state, output length
+    """
+    for layer in range(FLAGS.num_layers):
         with tf.variable_scope('encoder_{}'.format(layer)):
             cell_fw = tf.contrib.rnn.LSTMCell(
-                rnn_size,
+                FLAGS.rnn_size,
                 initializer=tf.random_uniform_initializer(
                     -0.1, 0.1, seed=2))
             cell_fw = tf.contrib.rnn.DropoutWrapper(
                 cell_fw,
-                output_keep_prob=keep_prob,
+                output_keep_prob=FLAGS.keep_prob,
                 variational_recurrent=True,
                 dtype=tf.float32,
                 input_size=rnn_inputs.get_shape()[2])
 
             cell_bw = tf.contrib.rnn.LSTMCell(
-                rnn_size,
+                FLAGS.rnn_size,
                 initializer=tf.random_uniform_initializer(
                     -0.1, 0.1, seed=2))
             cell_bw = tf.contrib.rnn.DropoutWrapper(
                 cell_bw,
-                output_keep_prob=keep_prob,
+                output_keep_prob=FLAGS.keep_prob,
                 variational_recurrent=True,
                 dtype=tf.float32,
                 input_size=rnn_inputs.get_shape()[2])
@@ -41,7 +49,7 @@ def encoding_layer(
                 input_lengths,
                 dtype=tf.float32)
 
-            if layer != num_layers - 1:
+            if layer != FLAGS.num_layers - 1:
                 rnn_inputs = tf.concat(enc_output, 2)
                 # Keep only every second element in the sequence
                 rnn_inputs = rnn_inputs[:, ::2, :]
@@ -51,46 +59,102 @@ def encoding_layer(
 
     return enc_output, enc_state, input_lengths
 
+def get_dec_cell(
+        enc_output,
+        enc_output_lengths,
+        use_lm,
+        fst,
+        tile_size):
+    """Decoding cell for attention based model
 
-def training_decoding_layer(
-        output_data,
-        output_lengths,
-        rnn_size,
+    Return:
+        `RNNCell` Instance
+    """
+
+    lstm = tf.contrib.rnn.LSTMCell(
+        FLAGS.rnn_size,
+        initializer=tf.random_uniform_initializer(-0.1, 0.1, seed=2))
+    dec_cell_inp = tf.contrib.rnn.DropoutWrapper(
+        lstm,
+        output_keep_prob=FLAGS.keep_prob,
+        variational_recurrent=True,
+        dtype=tf.float32)
+    lstm = tf.contrib.rnn.LSTMCell(
+        FLAGS.rnn_size,
+        initializer=tf.random_uniform_initializer(-0.1, 0.1, seed=2))
+    dec_cell = tf.contrib.rnn.DropoutWrapper(
+        lstm,
+        output_keep_prob=FLAGS.keep_prob,
+        variational_recurrent=True,
+        dtype=tf.float32)
+
+    dec_cell_out = tf.contrib.rnn.LSTMCell(
+        FLAGS.rnn_size,
+        num_proj=VOCAB_SIZE,
+        initializer=tf.random_uniform_initializer(-0.1, 0.1, seed=2))
+
+    dec_cell = tf.contrib.rnn.MultiRNNCell(
+        [dec_cell_inp] +
+        [dec_cell] * (FLAGS.num_decoding_layers - 2) +
+        [dec_cell_out])
+
+    enc_output = tf.contrib.seq2seq.tile_batch(
         enc_output,
-        input_lengths,
-        dec_cell,
-        batch_size,
-        start_token,
-        LMfst):
+        tile_size)
+
+    enc_output_lengths = tf.contrib.seq2seq.tile_batch(
+        enc_output_lengths,
+        tile_size)
+
     attn_mech = BahdanauAttentionCutoff(
-        rnn_size,
+        FLAGS.rnn_size,
         enc_output,
-        input_lengths,
+        enc_output_lengths,
         normalize=True,
         name='BahdanauAttention')
-
-    output_data = tf.concat(
-        [tf.fill([batch_size, 1], start_token), output_data[:, :-1]], 1)
 
     dec_cell = tf.contrib.seq2seq.AttentionWrapper(
         dec_cell,
         attn_mech,
-        vocab_size,
+        VOCAB_SIZE,
         output_attention=True)
 
-    # dec_cell = LMCellWrapper(dec_cell, LMfst, 5)
+    if use_lm:
+        dec_cell = LMCellWrapper(dec_cell, fst, 5)
+
+    return dec_cell
+
+
+#pylint: disable-msg=too-many-arguments
+def training_decoding_layer(
+        target_data,
+        target_lengths,
+        enc_output,
+        enc_output_lengths,
+        fst):
+    """ Training decoding layer for the model.
+
+    Returns:
+        Training logits
+    """
+    dec_cell = get_dec_cell(
+        enc_output,
+        enc_output_lengths,
+        FLAGS.use_train_lm,
+        fst,
+        1)
 
     initial_state = dec_cell.zero_state(
         dtype=tf.float32,
-        batch_size=batch_size)
+        batch_size=FLAGS.batch_size)
 
-    output_data = tf.nn.embedding_lookup(
-        tf.eye(vocab_size),
-        output_data)
+    target_data = tf.nn.embedding_lookup(
+        tf.eye(VOCAB_SIZE),
+        target_data)
 
     training_helper = tf.contrib.seq2seq.TrainingHelper(
-        inputs=output_data,
-        sequence_length=output_lengths,
+        inputs=target_data,
+        sequence_length=target_lengths,
         time_major=False)
 
     training_decoder = tf.contrib.seq2seq.BasicDecoder(
@@ -107,136 +171,78 @@ def training_decoding_layer(
 
 
 def inference_decoding_layer(
-        start_token,
-        end_token,
-        max_output_length,
-        batch_size,
-        beam_width,
-        rnn_size,
         enc_output,
-        input_lengths,
-        dec_cell,
-        LMfst):
-    enc_output = tf.contrib.seq2seq.tile_batch(
+        enc_output_lengths,
+        fst):
+    """ Inference decoding layer for the model.
+
+    Returns:
+        Predictions
+    """
+
+    dec_cell = get_dec_cell(
         enc_output,
-        beam_width)
-
-    input_lengths = tf.contrib.seq2seq.tile_batch(
-        input_lengths,
-        beam_width)
-
-    attn_mech = BahdanauAttentionCutoff(
-        rnn_size,
-        enc_output,
-        input_lengths,
-        normalize=True,
-        name='BahdanauAttention')
-
-    dec_cell = tf.contrib.seq2seq.AttentionWrapper(
-        dec_cell,
-        attn_mech,
-        vocab_size,
-        output_attention=True)
-
-    # dec_cell = LMCellWrapper(dec_cell, LMfst, 5)
+        enc_output_lengths,
+        FLAGS.use_inference_lm,
+        fst,
+        FLAGS.beam_width)
 
     initial_state = dec_cell.zero_state(
         dtype=tf.float32,
-        batch_size=batch_size * beam_width)
+        batch_size=FLAGS.batch_size * FLAGS.beam_width)
 
     start_tokens = tf.fill(
-        [batch_size],
-        start_token,
+        [FLAGS.batch_size],
+        VOCAB_TO_INT['<s>'],
         name='start_tokens')
 
     inference_decoder = tf.contrib.seq2seq.BeamSearchDecoder(
         dec_cell,
-        tf.eye(vocab_size),
+        tf.eye(VOCAB_SIZE),
         start_tokens,
-        end_token,
+        VOCAB_TO_INT['</s>'],
         initial_state,
-        beam_width)
+        FLAGS.beam_width)
 
     predictions, _, _ = tf.contrib.seq2seq.dynamic_decode(
         inference_decoder,
         output_time_major=False,
-        maximum_iterations=max_output_length)
+        maximum_iterations=FLAGS.max_output_length)
 
     return predictions
 
-
 def seq2seq_model(
         input_data,
-        output_data,
-        keep_prob,
+        target_data,
         input_lengths,
-        output_lengths,
-        max_output_length,
-        rnn_size,
-        num_layers,
-        batch_size,
-        beam_width,
-        learning_rate,
-        LMfst):
+        target_lengths,
+        fst):
+    """ Attention based model
 
-    enc_output, enc_state, enc_lengths = encoding_layer(
-        rnn_size,
+    Returns:
+        Logits, Predictions, Training operation, Cost, Step, Scores of beam
+        search
+    """
+
+    enc_output, _, enc_lengths = encoding_layer(
         input_lengths,
-        num_layers,
-        input_data,
-        keep_prob)
-
-    with tf.variable_scope('decoder'):
-        # For some reason sharing LSTMCell between first and middle layers is
-        # not working
-        lstm = tf.contrib.rnn.LSTMCell(
-            rnn_size,
-            initializer=tf.random_uniform_initializer(-0.1, 0.1, seed=2))
-        dec_cell_inp = tf.contrib.rnn.DropoutWrapper(
-            lstm,
-            output_keep_prob=keep_prob,
-            variational_recurrent=True,
-            dtype=tf.float32)
-        lstm = tf.contrib.rnn.LSTMCell(
-            rnn_size,
-            initializer=tf.random_uniform_initializer(-0.1, 0.1, seed=2))
-        dec_cell = tf.contrib.rnn.DropoutWrapper(
-            lstm,
-            output_keep_prob=keep_prob,
-            variational_recurrent=True,
-            dtype=tf.float32)
-
-        dec_cell_out = tf.contrib.rnn.LSTMCell(
-            rnn_size,
-            num_proj=vocab_size,
-            initializer=tf.random_uniform_initializer(-0.1, 0.1, seed=2))
-
-        dec_cell = tf.contrib.rnn.MultiRNNCell(
-            [dec_cell_inp] + [dec_cell] * (num_layers - 2) + [dec_cell_out])
+        input_data)
 
     with tf.variable_scope("decode"):
+        target_data = tf.concat(
+            [tf.fill([FLAGS.batch_size, 1], VOCAB_TO_INT['<s>']),
+             target_data[:, :-1]], 1)
         training_logits = training_decoding_layer(
-            output_data,
-            output_lengths,
-            rnn_size,
+            target_data,
+            target_lengths,
             enc_output,
             enc_lengths,
-            dec_cell,
-            batch_size,
-            vocab_to_int['<s>'],
-            LMfst)
+            fst)
     with tf.variable_scope("decode", reuse=True):
         predictions = inference_decoding_layer(
-            vocab_to_int['<s>'],
-            vocab_to_int['</s>'],
-            max_output_length,
-            batch_size,
-            beam_width,
-            rnn_size,
             enc_output,
             enc_lengths,
-            dec_cell,
-            LMfst)
+            fst)
 
     # Create tensors for the training logits and predictions
     training_logits = tf.identity(
@@ -251,8 +257,8 @@ def seq2seq_model(
 
     # Create the weights for sequence_loss
     masks = tf.sequence_mask(
-        output_lengths,
-        tf.reduce_max(output_lengths),
+        target_lengths,
+        tf.reduce_max(target_lengths),
         dtype=tf.float32,
         name='masks')
 
@@ -260,7 +266,7 @@ def seq2seq_model(
         # Loss function
         cost = tf.contrib.seq2seq.sequence_loss(
             training_logits,
-            output_data,
+            target_data,
             masks)
 
         tf.summary.scalar('cost', cost)
@@ -268,12 +274,12 @@ def seq2seq_model(
         step = tf.contrib.framework.get_or_create_global_step()
 
         # Optimizer
-        optimizer = tf.train.AdamOptimizer(learning_rate)
+        optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
 
         # Gradient Clipping
         gradients = optimizer.compute_gradients(cost)
-        capped_gradients = [(
-            tf.clip_by_value(grad, -5., 5.), var)
+        capped_gradients = [
+            (tf.clip_by_value(grad, -5., 5.), var)
             for grad, var in gradients if grad is not None]
         train_op = optimizer.apply_gradients(capped_gradients, step)
 
