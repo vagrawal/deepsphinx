@@ -1,6 +1,6 @@
 """ Language modelling for the tensorflow model"""
 import tensorflow as tf
-from deepsphinx.fst import fstCosts
+from deepsphinx.fst import fst_costs
 
 class LMCellWrapper(tf.contrib.rnn.RNNCell):
     """This class wraps a decoding cell to add LM scores"""

@@ -1,33 +1,42 @@
 #!/usr/bin/env python
 # vim: filetype=python
 
+"""Script for training the model"""
+import time
 import os
 import tensorflow as tf
-import numpy as np
-from seq2seq_model import seq2seq_model
-from data import read_data_queue, get_speaker_stats
-from vocab import vocab
-from vocab import vocab
-import time
-import argparse
-from fst import fstCosts
-from utils import FileOpen, wer
+from deepsphinx.seq2seq_model import seq2seq_model
+from deepsphinx.data import read_data_queue, get_speaker_stats
+from deepsphinx.vocab import VOCAB
+from deepsphinx.utils import FileOpen, wer, FLAGS
 import pywrapfst as fst
 
-
-def run_eval(graph, job_dir, checkpoint, queue, predictions, data_dir, nfilt,
-             outputs, output_lengths,
-             step, cost, keep_prob_tensor, mean_speaker, var_speaker,
-             best_n_inference, pred_scores, LMfst):
+def run_eval(graph,
+             queue,
+             predictions,
+             outputs,
+             output_lengths,
+             step,
+             cost,
+             keep_prob_tensor,
+             mean_speaker,
+             var_speaker,
+             pred_scores,
+             lm_fst):
+    """Evaluate with eval dataset"""
 
     tf.logging.info("Evaluation started")
     with graph.as_default():
-        writer = tf.summary.FileWriter(job_dir)
+        writer = tf.summary.FileWriter(FLAGS.job_dir)
         tf.Session.reset(None, ['queue'])
         with tf.Session() as sess:
-            tf.train.Saver().restore(sess, checkpoint)
-            read_data_queue('si_et_05', queue, data_dir, nfilt,
-                            sess, mean_speaker, var_speaker, LMfst)
+            tf.train.Saver().restore(sess, FLAGS.checkpoint_dir)
+            read_data_queue('eval',
+                            queue,
+                            sess,
+                            mean_speaker,
+                            var_speaker,
+                            lm_fst)
             tot_wer = 0.0
             tot_cer = 0.0
             batch_loss = 0.0
@@ -40,7 +49,7 @@ def run_eval(graph, job_dir, checkpoint, queue, predictions, data_dir, nfilt,
 
             with coord.stop_on_exception():
                 while not coord.should_stop():
-                    pred, sc, out, out_len, loss = sess.run(
+                    pred, score, out, out_len, loss = sess.run(
                         [predictions, pred_scores, outputs, output_lengths, cost],
                         feed_dict={keep_prob_tensor: 1.0})
                     tot_ev += pred.shape[0]
@@ -49,10 +58,10 @@ def run_eval(graph, job_dir, checkpoint, queue, predictions, data_dir, nfilt,
                     for i in range(pred.shape[0]):
                         best_wer = 100.0
                         best_cer = 100.0
-                        for j in range(best_n_inference):
-                            real_out = ''.join([vocab[l]
+                        for j in range(FLAGS.best_n_inference):
+                            real_out = ''.join([VOCAB[l]
                                                 for l in out[i, :out_len[i] - 1]])
-                            pred_out = ''.join([vocab[l]
+                            pred_out = ''.join([VOCAB[l]
                                                 for l in pred[i, :, j]])
                             pred_out = pred_out.split('<')[0]
                             cur_wer = wer(real_out.split(), pred_out.split())
@@ -65,46 +74,28 @@ def run_eval(graph, job_dir, checkpoint, queue, predictions, data_dir, nfilt,
 
             tf.logging.info('WER: {}, CER: {}'.format(
                 tot_wer / tot_ev, tot_cer / tot_ev))
-            summary = tf.Summary(value=[tf.Summary.Value(tag="WER_valid", simple_value=tot_wer / tot_ev),
-                                        tf.Summary.Value(
-                tag="CER_valid", simple_value=tot_cer / tot_ev),
-                tf.Summary.Value(tag="loss_valid",
-                                 simple_value=batch_loss / tot_bat)
-            ])
+            summary = tf.Summary(
+                value=[tf.Summary.Value(tag="WER_valid", simple_value=tot_wer / tot_ev),
+                       tf.Summary.Value(tag="CER_valid", simple_value=tot_cer / tot_ev),
+                       tf.Summary.Value(tag="loss_valid", simple_value=batch_loss / tot_bat)
+                      ])
             writer.add_summary(summary, global_step=sess.run(step))
             writer.flush()
             coord.request_stop()
     tf.logging.info("Evaluation finished")
 
 
-def train(
-        nfilt,
-        keep_prob,
-        max_output_len,
-        rnn_size,
-        num_layers,
-        batch_size,
-        learning_rate,
-        num_epochs,
-        beam_width,
-        learning_rate_decay,
-        min_learning_rate,
-        display_step,
-        data_dir,
-        job_dir,
-        checkpoint_path,
-        best_n_inference,
-        eval_only,
-        fst_path):
+def train():
+    """Train the model and evaluate at every epoch"""
 
-    checkpoint = job_dir + 'checkpoints/'
+    checkpoint = os.path.join(FLAGS.job_dir, 'checkpoints/')
 
-    if eval_only:
-        sets = ['si_et_05']
+    if FLAGS.eval_only:
+        sets = ['eval']
     else:
-        sets = ['si_et_05', 'si_tr_s']
+        sets = ['eval', 'train']
 
-    LMfst = fst.Fst.read_from_string(FileOpen(fst_path).read())
+    lm_fst = fst.Fst.read_from_string(FileOpen(FLAGS.fst_path).read())
 
     graph = tf.Graph()
     with graph.as_default():
@@ -119,24 +110,17 @@ def train(
             queue = tf.PaddingFIFOQueue(
                 capacity=64,
                 dtypes=['float32', 'int32', 'int32', 'int32'],
-                shapes=[[None, nfilt * 3 + 1], [], [None], []],
+                shapes=[[None, FLAGS.nfilt * 3 + 1], [], [None], []],
                 name='feed_queue')
             inputs, input_lengths, outputs, output_lengths = queue.dequeue_many(
-                batch_size)
+                FLAGS.batch_size)
 
         training_logits, predictions, train_op, cost, step, pred_scores = seq2seq_model(
             inputs,
             outputs,
-            keep_prob_tensor,
             input_lengths,
             output_lengths,
-            max_output_len,
-            rnn_size,
-            num_layers,
-            tf.shape(input_lengths)[0],
-            beam_width,
-            learning_rate_tensor,
-            LMfst)
+            fst)
 
         writer = tf.summary.FileWriter(job_dir)
         saver = tf.train.Saver()
@@ -148,31 +132,40 @@ def train(
 
         last_wer = 100.0
 
-        for epoch_i in range(1, num_epochs + 1):
-            # Don't waste time on evaluation for high WERs in training
-            if (checkpoint_path is not None and last_wer < 20.0):
-                run_eval(graph, job_dir, checkpoint_path, queue, predictions, data_dir,
-                         nfilt, outputs,
-                         output_lengths, step, cost, keep_prob_tensor,
-                         mean_speaker, var_speaker, best_n_inference,
-                         pred_scores, LMfst)
-                if (eval_only):
-                    coord.request_stop()
-                    return
+        for epoch_i in range(1, FLAGS.num_epochs + 1):
+            if (FLAGS.checkpoint_path is not None):
+                run_eval(graph,
+                         queue,
+                         predictions,
+                         outputs,
+                         output_lengths,
+                         step,
+                         cost,
+                         keep_prob_tensor,
+                         mean_speaker,
+                         var_speaker,
+                         pred_scores,
+                         lm_fst)
+            if FLAGS.eval_only:
+                return
             tf.Session.reset(None, ['queue'])
             with tf.Session() as sess:
                 coord = tf.train.Coordinator(
                     clean_stop_exception_types=(
                         tf.errors.CancelledError,
                         tf.errors.OutOfRangeError))
-                if (checkpoint_path is None):
+                if (FLAGS.checkpoint_path is None):
                     sess.run(tf.global_variables_initializer())
                     sess.run(tf.local_variables_initializer())
                 else:
-                    saver.restore(sess, checkpoint_path)
+                    saver.restore(sess, FLAGS.checkpoint_path)
 
-                read_data_queue('si_tr_s', queue, data_dir, nfilt,
-                                sess, mean_speaker, var_speaker, LMfst)
+                read_data_queue('train',
+                                queue,
+                                sess,
+                                mean_speaker,
+                                var_speaker,
+                                lm_fst)
 
                 with coord.stop_on_exception():
                     while not coord.should_stop():
@@ -240,25 +233,24 @@ def train(
 
 if __name__ == "__main__":
     tf.logging.set_verbosity(tf.logging.INFO)
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--nfilt", default=40, type=int)
-    parser.add_argument("--keep-prob", default=0.8, type=float)
-    parser.add_argument("--max-output-len",  default=200, type=int)
-    parser.add_argument("--rnn-size", default=256, type=int)
-    parser.add_argument("--num-layers",  default=3, type=int)
-    parser.add_argument("--batch-size",  default=24, type=int)
-    parser.add_argument("--learning-rate", default=0.001, type=float)
-    parser.add_argument("--num-epochs", default=16, type=int)
-    parser.add_argument("--beam-width", default=8, type=int)
-    parser.add_argument("--learning-rate-decay", default=0.9998, type=float)
-    parser.add_argument("--min-learning-rate", default=0.0002, type=float)
+    flags = tf.app.flags
+    flags.DEFINE_integer("nfilt", 40, "Number of filters in mel specta")
+    flags.DEFINE_float("keep_prob", 0.8, "Keep probability for dropout")
+    flags.DEFINE_integer("max_output_len", 200, "")
+    flags.DEFINE_integer("rnn_size", 256, "")
+    flags.DEFINE_integer("num_layers", 3, "")
+    flags.DEFINE_integer("batch_size", 24, "")
+    flags.DEFINE_float("learning_rate", 0.001, "")
+    flags.DEFINE_integer("num_epochs", 16, "")
+    flags.DEFINE_integer("beam_width", 8, "")
+    flags.DEFINE_float("learning_rate_decay", 0.9998, "")
+    flags.DEFINE_float("min_learning_rate", 0.0002, "")
     # Check training loss after every display_step batches
-    parser.add_argument("--display-step", default=20, type=int)
-    parser.add_argument("--data-dir", default='gs://wsj-data/wsj0/')
-    parser.add_argument("--job-dir", default='./job/')
-    parser.add_argument("--checkpoint-path", default=None)
-    parser.add_argument("--best-n-inference", default=1, type=int)
-    parser.add_argument("--eval-only", default=False, type=bool)
-    parser.add_argument("--fst-path")
-    args = parser.parse_args()
-    train(**args.__dict__)
+    flags.DEFINE_integer("display_step", 20, "")
+    flags.DEFINE_string("data_dir", 'gs://wsj-data/wsj0/', "")
+    flags.DEFINE_string("job-dir", './job/', "")
+    flags.DEFINE_string("checkpoint-path", None, "")
+    flags.DEFINE_integer("best-n-inference", 1, "")
+    flags.DEFINE_integer("eval-only", False, "")
+    flags.DEFINE_string("fst-path", None, "")
+    tf.app.run(train)
