@@ -4,10 +4,10 @@ Introduction
 ------------
 
 This repo contains an end-to-end speech recognition system implented using
-tensorflow. It currently works on Wall Stret Journal Corpus. It uses
-bidirectional LSTMs in the encoding layer with attention in the decoding layer.
-The LSTMs in the encoding layer are strided and in every layer, the time
-dimension is reduced by 2. The complete model looks much like one from [1].
+tensorflow. It uses bidirectional LSTMs in the encoding layer with attention
+in the decoding layer. The LSTMs in the encoding layer are strided and in every
+layer, the time dimension is reduced by 2. The complete model looks much like
+one from [1].
 
 #### Encoding layer(default configuration contains 3 bidirectional layers):
 
@@ -17,67 +17,73 @@ dimension is reduced by 2. The complete model looks much like one from [1].
 
 ![model](images/model_decoding.png)
 
-Description
+Data format
 -----------
 
-There are three main files in the code:
-
-- `data.py` contains functions for loading the data
-- `seq2seq_model.py` contains attention based model
-- `train.py` contains code for training and evaluating the model
+Data contains transcript file and audio in flac format. The format of
+transcription file is `<transcript>\<set_id>\<speaker_id>\<file path>`
 
 Usage
 -----
 
-Install `tensorflow` and `python_speech_features` first before running.
+Install `tensorflow`, `python_speech_features` and `openfst` first before
+running, and generate FST if set in command line options.
 
 
 ```
-usage: train.py [-h] [--numcep NUMCEP] [--keep-prob KEEP_PROB]
-                [--max-output-len MAX_OUTPUT_LEN] [--rnn-size RNN_SIZE]
-                [--num-layers NUM_LAYERS] [--batch-size BATCH_SIZE]
-                [--learning-rate LEARNING_RATE] [--num-epochs NUM_EPOCHS]
-                [--beam-width BEAM_WIDTH]
-                [--learning-rate-decay LEARNING_RATE_DECAY]
-                [--min-learning-rate MIN_LEARNING_RATE]
-                [--display-step DISPLAY_STEP] [--data-dir DATA_DIR]
-                [--job-dir JOB_DIR]
+usage: deepsphinx_train [-h] [--nfilt NFILT] [--keep_prob KEEP_PROB]
+                        [--max_output_len MAX_OUTPUT_LEN]
+                        [--rnn_size RNN_SIZE] [--num_layers NUM_LAYERS]
+                        [--batch_size BATCH_SIZE]
+                        [--learning_rate LEARNING_RATE]
+                        [--num_epochs NUM_EPOCHS] [--beam_width BEAM_WIDTH]
+                        [--learning_rate_decay LEARNING_RATE_DECAY]
+                        [--min_learning_rate MIN_LEARNING_RATE]
+                        [--display_step DISPLAY_STEP] [--data_dir DATA_DIR]
+                        [--job-dir JOB_DIR]
+                        [--checkpoint-path CHECKPOINT_PATH]
+                        [--best-n-inference BEST_N_INFERENCE]
+                        [--eval-only EVAL_ONLY] [--fst-path FST_PATH]
 
 optional arguments:
   -h, --help            show this help message and exit
-  --numcep NUMCEP
-  --keep-prob KEEP_PROB
-  --max-output-len MAX_OUTPUT_LEN
-  --rnn-size RNN_SIZE
-  --num-layers NUM_LAYERS
-  --batch-size BATCH_SIZE
-  --learning-rate LEARNING_RATE
-  --num-epochs NUM_EPOCHS
-  --beam-width BEAM_WIDTH
-  --learning-rate-decay LEARNING_RATE_DECAY
-  --min-learning-rate MIN_LEARNING_RATE
-  --display-step DISPLAY_STEP
-  --data-dir DATA_DIR
-  --job-dir JOB_DIR
-```
+  --nfilt NFILT         Number of filters in mel specta
+  --keep_prob KEEP_PROB
+                        Keep probability for dropout
+  --max_output_len MAX_OUTPUT_LEN
+                        Maximum output length for Beam Search
+  --rnn_size RNN_SIZE   Size of LSTM
+  --num_layers NUM_LAYERS
+                        Number of LSTM Layers
+  --batch_size BATCH_SIZE
+                        Batch size of data
+  --learning_rate LEARNING_RATE
+                        Learning rate
+  --num_epochs NUM_EPOCHS
+                        Number of epochs
+  --beam_width BEAM_WIDTH
+                        Beam width. Must be lesser than vocab size
+  --learning_rate_decay LEARNING_RATE_DECAY
+                        Learning rate decay
+  --min_learning_rate MIN_LEARNING_RATE
+                        Minimum learning rate
+  --display_step DISPLAY_STEP
+                        Check training loss after every display_step batches
+  --data_dir DATA_DIR   Directory of data
+  --job-dir JOB_DIR     Directory in which summary and checkpoint is stored
+  --checkpoint-path CHECKPOINT_PATH
+                        Load a trained model
+  --best-n-inference BEST_N_INFERENCE
+                        Take best of n for beam search
+  --eval-only EVAL_ONLY
+                        Only evaluate. --checkpoint-path is required
+  --fst-path FST_PATH   Path of language FST```
 
 Current results
 ---------------
 
-I am getting 29.77% WER and 12.73 CER for validation set using the latest code
-(91c2ed5).
+I am getting round 15% WER in dev93 by training in si_284 set.
 
-![Iter3](images/iter-3.png)
-
-
-Future aims
------------
-
-My aim to get around 10% WER, as reported by many RNN based papers. The
-biggest thing that can impact the accuracy is the explicit language model, which
-I plan to start implementing soon. Also I plan to experiment with many things
-that are not currently present like normalization of features, to see if they
-can improve the accuracy.
 
 [1]: Dzmitry Bahdanau, Jan Chorowski, Dmitriy Serdyuk,
 Philemon Brakel, and Yoshua Bengio, “End-to-end
