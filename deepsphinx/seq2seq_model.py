@@ -7,7 +7,8 @@ from deepsphinx.attention import BahdanauAttentionCutoff
 
 def encoding_layer(
         input_lengths,
-        rnn_inputs):
+        rnn_inputs,
+        keep_prob):
     """ Encoding layer for the model.
 
     Args:
@@ -26,7 +27,7 @@ def encoding_layer(
                     -0.1, 0.1, seed=2))
             cell_fw = tf.contrib.rnn.DropoutWrapper(
                 cell_fw,
-                output_keep_prob=FLAGS.keep_prob,
+                output_keep_prob=keep_prob,
                 variational_recurrent=True,
                 dtype=tf.float32,
                 input_size=rnn_inputs.get_shape()[2])
@@ -37,7 +38,7 @@ def encoding_layer(
                     -0.1, 0.1, seed=2))
             cell_bw = tf.contrib.rnn.DropoutWrapper(
                 cell_bw,
-                output_keep_prob=FLAGS.keep_prob,
+                output_keep_prob=keep_prob,
                 variational_recurrent=True,
                 dtype=tf.float32,
                 input_size=rnn_inputs.get_shape()[2])
@@ -64,7 +65,8 @@ def get_dec_cell(
         enc_output_lengths,
         use_lm,
         fst,
-        tile_size):
+        tile_size,
+        keep_prob):
     """Decoding cell for attention based model
 
     Return:
@@ -76,7 +78,7 @@ def get_dec_cell(
         initializer=tf.random_uniform_initializer(-0.1, 0.1, seed=2))
     dec_cell_inp = tf.contrib.rnn.DropoutWrapper(
         lstm,
-        output_keep_prob=FLAGS.keep_prob,
+        output_keep_prob=keep_prob,
         variational_recurrent=True,
         dtype=tf.float32)
     lstm = tf.contrib.rnn.LSTMCell(
@@ -84,7 +86,7 @@ def get_dec_cell(
         initializer=tf.random_uniform_initializer(-0.1, 0.1, seed=2))
     dec_cell = tf.contrib.rnn.DropoutWrapper(
         lstm,
-        output_keep_prob=FLAGS.keep_prob,
+        output_keep_prob=keep_prob,
         variational_recurrent=True,
         dtype=tf.float32)
 
@@ -131,7 +133,8 @@ def training_decoding_layer(
         target_lengths,
         enc_output,
         enc_output_lengths,
-        fst):
+        fst,
+        keep_prob):
     """ Training decoding layer for the model.
 
     Returns:
@@ -142,7 +145,8 @@ def training_decoding_layer(
         enc_output_lengths,
         FLAGS.use_train_lm,
         fst,
-        1)
+        1,
+        keep_prob)
 
     initial_state = dec_cell.zero_state(
         dtype=tf.float32,
@@ -173,7 +177,8 @@ def training_decoding_layer(
 def inference_decoding_layer(
         enc_output,
         enc_output_lengths,
-        fst):
+        fst,
+        keep_prob):
     """ Inference decoding layer for the model.
 
     Returns:
@@ -216,7 +221,8 @@ def seq2seq_model(
         target_data,
         input_lengths,
         target_lengths,
-        fst):
+        fst,
+        keep_prob):
     """ Attention based model
 
     Returns:
@@ -226,7 +232,8 @@ def seq2seq_model(
 
     enc_output, _, enc_lengths = encoding_layer(
         input_lengths,
-        input_data)
+        input_data,
+        keep_prob)
 
     with tf.variable_scope("decode"):
         target_data = tf.concat(
@@ -237,12 +244,14 @@ def seq2seq_model(
             target_lengths,
             enc_output,
             enc_lengths,
-            fst)
+            fst,
+            keep_prob)
     with tf.variable_scope("decode", reuse=True):
         predictions = inference_decoding_layer(
             enc_output,
             enc_lengths,
-            fst)
+            fst,
+            keep_prob)
 
     # Create tensors for the training logits and predictions
     training_logits = tf.identity(

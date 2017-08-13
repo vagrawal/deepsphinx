@@ -30,7 +30,7 @@ def run_eval(graph,
         writer = tf.summary.FileWriter(FLAGS.job_dir)
         tf.Session.reset(None, ['queue'])
         with tf.Session() as sess:
-            tf.train.Saver().restore(sess, FLAGS.checkpoint_dir)
+            tf.train.Saver().restore(sess, FLAGS.checkpoint_path)
             read_data_queue('eval',
                             queue,
                             sess,
@@ -49,7 +49,7 @@ def run_eval(graph,
 
             with coord.stop_on_exception():
                 while not coord.should_stop():
-                    pred, score, out, out_len, loss = sess.run(
+                    pred, _, out, out_len, loss = sess.run(
                         [predictions, pred_scores, outputs, output_lengths, cost],
                         feed_dict={keep_prob_tensor: 1.0})
                     tot_ev += pred.shape[0]
@@ -85,7 +85,7 @@ def run_eval(graph,
     tf.logging.info("Evaluation finished")
 
 
-def train():
+def train(_):
     """Train the model and evaluate at every epoch"""
 
     checkpoint = os.path.join(FLAGS.job_dir, 'checkpoints/')
@@ -120,17 +120,16 @@ def train():
             outputs,
             input_lengths,
             output_lengths,
-            fst)
+            fst,
+            keep_prob_tensor)
 
-        writer = tf.summary.FileWriter(job_dir)
+        writer = tf.summary.FileWriter(FLAGS.job_dir)
         saver = tf.train.Saver()
         batch_loss = 0.0
         writer.add_graph(graph)
 
-        mean_speaker, var_speaker = get_speaker_stats(data_dir, nfilt, sets)
+        mean_speaker, var_speaker = get_speaker_stats(data_dir, FLAGS.nfilt, sets)
         tf.logging.info('Starting training')
-
-        last_wer = 100.0
 
         for epoch_i in range(1, FLAGS.num_epochs + 1):
             if (FLAGS.checkpoint_path is not None):
@@ -147,7 +146,7 @@ def train():
                          pred_scores,
                          lm_fst)
             if FLAGS.eval_only:
-                return
+                break
             tf.Session.reset(None, ['queue'])
             with tf.Session() as sess:
                 coord = tf.train.Coordinator(
@@ -173,8 +172,8 @@ def train():
 
                         loss, _, batch_i = sess.run(
                             [cost, train_op, step],
-                            feed_dict={learning_rate_tensor: learning_rate,
-                                       keep_prob_tensor: keep_prob})
+                            feed_dict={learning_rate_tensor: FLAGS.learning_rate,
+                                       keep_prob_tensor: FLAGS.keep_prob})
 
                         batch_loss += loss
                         end_time = time.time()
@@ -195,8 +194,8 @@ def train():
                                 feed_dict={keep_prob_tensor: 1.0})
                             for i in range(pred.shape[0]):
                                 real_out = ''.join(
-                                    [vocab[l] for l in out[i, :out_len[i] - 1]])
-                                pred_out = ''.join([vocab[l]
+                                    [VOCAB[l] for l in out[i, :out_len[i] - 1]])
+                                pred_out = ''.join([VOCAB[l]
                                                     for l in pred[i, :, 0]])
                                 pred_out = pred_out.split('<')[0]
                                 tot_wer += wer(real_out.split(),
@@ -208,24 +207,26 @@ def train():
                                 'Sample predicted output: {}'.format(pred_out))
                             tf.logging.info('WER: {}, CER: {}'.format(
                                 tot_wer / pred.shape[0], tot_cer / pred.shape[0]))
-                            summary = tf.Summary(value=[tf.Summary.Value(tag="WER", simple_value=tot_wer / pred.shape[0]),
-                                                        tf.Summary.Value(
-                                tag="CER", simple_value=tot_cer / pred.shape[0]),
-                                tf.Summary.Value(
-                                tag="loss", simple_value=batch_loss / display_step)
-                            ])
-                            last_wer = tot_wer / pred.shape[0]
+                            summary = tf.Summary(
+                                value=[tf.Summary.Value(
+                                    tag="WER", simple_value=tot_wer / pred.shape[0]),
+                                       tf.Summary.Value(
+                                           tag="CER", simple_value=tot_cer / pred.shape[0]),
+                                       tf.Summary.Value(
+                                           tag="loss",
+                                           simple_value=batch_loss / FLAGS.display_step)
+                                      ])
                             writer.add_summary(summary, global_step=batch_i)
                             writer.flush()
                             batch_loss = 0.0
 
                         # Reduce learning rate, but not below its minimum value
-                        learning_rate *= learning_rate_decay
-                        if learning_rate < min_learning_rate:
-                            learning_rate = min_learning_rate
+                        FLAGS.learning_rate *= FLAGS.learning_rate_decay
+                        if FLAGS.learning_rate < FLAGS.min_learning_rate:
+                            FLAGS.learning_rate = FLAGS.min_learning_rate
 
                 tf.logging.info("Epoch completed, saving")
-                checkpoint_path = saver.save(
+                FLAGS.checkpoint_path = saver.save(
                     sess, checkpoint, step)
 
                 coord.request_stop()
@@ -238,7 +239,8 @@ if __name__ == "__main__":
     flags.DEFINE_float("keep_prob", 0.8, "Keep probability for dropout")
     flags.DEFINE_integer("max_output_len", 200, "Maximum output length for Beam Search")
     flags.DEFINE_integer("rnn_size", 256, "Size of LSTM")
-    flags.DEFINE_integer("num_layers", 3, "Number of LSTM Layers")
+    flags.DEFINE_integer("num_layers", 3, "Number of LSTM Layers for encoding layer")
+    flags.DEFINE_integer("num_decoding_layers", 3, "Number of LSTM Layers for decoding layer")
     flags.DEFINE_integer("batch_size", 24, "Batch size of data")
     flags.DEFINE_float("learning_rate", 0.001, "Learning rate")
     flags.DEFINE_integer("num_epochs", 16, "Number of epochs")
@@ -246,10 +248,14 @@ if __name__ == "__main__":
     flags.DEFINE_float("learning_rate_decay", 0.9998, "Learning rate decay")
     flags.DEFINE_float("min_learning_rate", 0.0002, "Minimum learning rate")
     flags.DEFINE_integer("display_step", 20, "Check training loss after every display_step batches")
-    flags.DEFINE_string("data_dir", 'gs://wsj-data/wsj0/', "Directory of data")
-    flags.DEFINE_string("job-dir", './job/', "Directory in which summary and checkpoint is stored")
-    flags.DEFINE_string("checkpoint-path", None, "Load a trained model")
-    flags.DEFINE_integer("best-n-inference", 1, "Take best of n for beam search")
-    flags.DEFINE_integer("eval-only", False, "Only evaluate. --checkpoint-path is required")
-    flags.DEFINE_string("fst-path", None, "Path of language FST")
+    flags.DEFINE_string("data_dir", None, "Directory of data")
+    flags.DEFINE_string("job_dir", './job/', "Directory in which summary and checkpoint is stored")
+    flags.DEFINE_string("checkpoint_path", None, "Load a trained model")
+    flags.DEFINE_integer("best_n_inference", 1, "Take best of n for beam search")
+    flags.DEFINE_integer("eval_only", False, "Only evaluate. --checkpoint-path is required")
+    flags.DEFINE_string("fst_path", None, "Path of language FST")
+    flags.DEFINE_integer("cutoff_range", 100, "Attention cutoff from previous mean range")
+    flags.DEFINE_string("trans_file", None, "Path of transcription file")
+    flags.DEFINE_bool("use_inference_lm", False, "Use LM during inference")
+    flags.DEFINE_bool("use_train_lm", False, "Use LM during training")
     tf.app.run(train)
