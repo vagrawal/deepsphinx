@@ -9,13 +9,14 @@ in the decoding layer. The LSTMs in the encoding layer are strided and in every
 layer, the time dimension is reduced by 2. The complete model looks much like
 one from [1].
 
-#### Encoding layer(default configuration contains 3 bidirectional layers):
+Model
+-----
 
-![model](images/model_encoding.png)
+Default configuration contains 3 bidirectional layers for encoding and decoding
+layer:
 
-#### Decoding layer:
+![model](images/model.jpeg)
 
-![model](images/model_decoding.png)
 
 Data format
 -----------
