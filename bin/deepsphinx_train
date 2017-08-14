@@ -132,7 +132,6 @@ def train(_):
         writer.add_graph(graph)
 
         mean_speaker, var_speaker = get_speaker_stats(sets)
-        print mean_speaker, var_speaker
         tf.logging.info('Starting training')
 
         for epoch_i in range(1, FLAGS.num_epochs + 1):
