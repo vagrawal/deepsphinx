@@ -190,7 +190,8 @@ def inference_decoding_layer(
         enc_output_lengths,
         FLAGS.use_inference_lm,
         fst,
-        FLAGS.beam_width)
+        FLAGS.beam_width,
+        keep_prob)
 
     initial_state = dec_cell.zero_state(
         dtype=tf.float32,
@@ -212,7 +213,7 @@ def inference_decoding_layer(
     predictions, _, _ = tf.contrib.seq2seq.dynamic_decode(
         inference_decoder,
         output_time_major=False,
-        maximum_iterations=FLAGS.max_output_length)
+        maximum_iterations=FLAGS.max_output_len)
 
     return predictions
 

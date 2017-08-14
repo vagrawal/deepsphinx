@@ -11,7 +11,7 @@ import soundfile as sf
 
 def get_features(audio_file):
     """Get features from a file"""
-    signal, sample_rate = sf.read(FileOpen(audio_file))
+    signal, sample_rate = sf.read(audio_file)
     feat, energy = fbank(signal, sample_rate, nfilt=FLAGS.nfilt)
     feat = np.log(feat)
     dfeat = delta(feat, 2)
@@ -27,6 +27,7 @@ def get_speaker_stats(set_ids):
     sum_sq_speaker = {}
     count_speaker = {}
     for line in trans:
+        line = line.strip()
         _, set_id, speaker, audio_file = line.split('\\')
         if set_id in set_ids:
             n_feat = 3 * FLAGS.nfilt + 1
@@ -95,6 +96,7 @@ def read_data_thread(
     trans = FileOpen(FLAGS.trans_file).readlines()
     random.shuffle(trans)
     for line in trans:
+        line = line.strip()
         text, set_id_trans, speaker, audio_file = line.split('\\')
         try:
             text = [VOCAB_TO_INT[c]
