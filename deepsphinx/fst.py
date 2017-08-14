@@ -47,7 +47,7 @@ def dfs_find(state, prob, fst, inp, out):
 
 def combine(probs):
     """ Add various log probabilities"""
-    if not probs:
+    if len(probs) == 0:
         return np.float32(-50.0)
     probs_max = np.max(probs)
     return probs_max + np.log(np.sum(np.exp(probs - probs_max)))

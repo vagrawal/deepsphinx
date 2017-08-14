@@ -104,7 +104,7 @@ def read_data_thread(
         except KeyError:
             continue
         if (set_id == set_id_trans and
-                ((not FLAGS.use_train_lm) or in_fst(text, fst))):
+                ((not FLAGS.use_train_lm) or in_fst(fst, text))):
             feat = get_features(audio_file)
             feat = feat - mean_speaker[speaker]
             feat = feat / np.sqrt(var_speaker[speaker])
