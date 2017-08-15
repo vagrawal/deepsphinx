@@ -237,11 +237,11 @@ def seq2seq_model(
         keep_prob)
 
     with tf.variable_scope("decode"):
-        target_data = tf.concat(
+        target_data_all = tf.concat(
             [tf.fill([FLAGS.batch_size, 1], VOCAB_TO_INT['<s>']),
              target_data[:, :-1]], 1)
         training_logits = training_decoding_layer(
-            target_data,
+            target_data_all,
             target_lengths,
             enc_output,
             enc_lengths,
