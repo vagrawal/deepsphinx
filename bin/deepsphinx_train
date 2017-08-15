@@ -9,7 +9,10 @@ from deepsphinx.seq2seq_model import seq2seq_model
 from deepsphinx.data import read_data_queue, get_speaker_stats
 from deepsphinx.vocab import VOCAB
 from deepsphinx.utils import FileOpen, wer, FLAGS
-import pywrapfst as fst
+try:
+    import pywrapfst as fst
+except ImportError:
+    pass
 
 def run_eval(graph,
              queue,
