@@ -11,7 +11,7 @@ Model
 -----
 
 Default configuration contains 3 bidirectional layers for encoding and decoding
-layer:
+layer, similar to this:
 
 ![model](images/model.jpg)
 
@@ -21,7 +21,8 @@ Data format
 
 Data contains transcripts file and audio in flac format. The format of
 transcription file is `<transcript>\<set_id>\<speaker_id>\<file path>` for each
-transcript. Transcripts are separated by newline.
+transcript. Transcripts are separated by newline. If speaker ID is not
+available, any word(e.g `None`) can be used.
 
 Usage
 -----
@@ -102,6 +103,19 @@ Language model
 --------------
 
 See file `make_fst` for commands for generating Language model FST.
+
+API Usage
+---------
+
+There is a minimal API present for prediction of sequence from audio files. As
+it is not fully complete, it is recommended to read it before using it. The
+usage is intended to be something like this:
+
+```
+from deepsphinx.api import Predict
+ds = Predict(Predict.default_flags(), 'path/to/checkpoint')
+ds.predict('path/to/audio')
+```
 
 Current results
 ---------------
