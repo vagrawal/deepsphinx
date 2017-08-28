@@ -1,4 +1,4 @@
-"""Data utilities"""
+'''Data utilities'''
 import threading
 import random
 import numpy as np
@@ -10,7 +10,7 @@ from deepsphinx.fst import in_fst
 import soundfile as sf
 
 def get_features(audio_file):
-    """Get features from a file"""
+    '''Get features from a file'''
     signal, sample_rate = sf.read(audio_file)
     feat, energy = fbank(signal, sample_rate, nfilt=FLAGS.nfilt)
     feat = np.log(feat)
@@ -20,8 +20,8 @@ def get_features(audio_file):
                           axis=1)
 
 def get_speaker_stats(set_ids):
-    """Get mean and variance of a speaker"""
-    tf.logging.info("Getting speaker stats")
+    '''Get mean and variance of a speaker'''
+    tf.logging.info('Getting speaker stats')
     trans = FileOpen(FLAGS.trans_file).readlines()
     sum_speaker = {}
     sum_sq_speaker = {}
@@ -52,7 +52,7 @@ def read_data_queue(
         mean_speaker,
         var_speaker,
         fst):
-    """Start a thread to add data in a queue"""
+    '''Start a thread to add data in a queue'''
     input_data = tf.placeholder(dtype=tf.float32, shape=[None, FLAGS.nfilt * 3 + 1])
     input_length = tf.placeholder(dtype=tf.int32, shape=[])
     output_data = tf.placeholder(dtype=tf.int32, shape=[None])
@@ -91,7 +91,7 @@ def read_data_thread(
         mean_speaker,
         var_speaker,
         fst):
-    """Enqueue data to queue"""
+    '''Enqueue data to queue'''
 
     trans = FileOpen(FLAGS.trans_file).readlines()
     random.shuffle(trans)

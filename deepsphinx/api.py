@@ -1,4 +1,4 @@
-""" A minimal API for the prediction for an audio file """
+''' A minimal API for the prediction for an audio file '''
 from deepsphinx.seq2seq_model import seq2seq_model
 from deepsphinx.utils import FLAGS
 from deepsphinx.vocab import VOCAB, VOCAB_SIZE
@@ -6,7 +6,7 @@ from deepsphinx.data import get_features
 import tensorflow as tf
 
 class Predict(object):
-    """ Set flags and restore from checkpoint """
+    ''' Set flags and restore from checkpoint '''
     def __init__(self, flags, checkpoint_path, lm_fst=None):
         self.graph = tf.Graph()
         with self.graph.as_default():
@@ -41,7 +41,7 @@ class Predict(object):
                 }
 
     def predict(self, audio_file):
-        """ Predict and return string output by beam search """
+        ''' Predict and return string output by beam search '''
         feat = get_features(audio_file)
         pred = self.sess.run(self.predictions, feed_dict={
             self.input: [feat], self.input_length: [feat.shape[0]]})

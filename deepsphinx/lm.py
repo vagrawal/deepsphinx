@@ -1,9 +1,9 @@
-""" Language modelling for the tensorflow model"""
+''' Language modelling for the tensorflow model'''
 import tensorflow as tf
 from deepsphinx.fst import fst_costs
 
 class LMCellWrapper(tf.contrib.rnn.RNNCell):
-    """This class wraps a decoding cell to add LM scores"""
+    '''This class wraps a decoding cell to add LM scores'''
 
     def __init__(self, dec_cell, fst, max_states, reuse=None):
         super(LMCellWrapper, self).__init__(_reuse=reuse)
@@ -19,21 +19,21 @@ class LMCellWrapper(tf.contrib.rnn.RNNCell):
 
     @property
     def state_size(self):
-        """State size of the cell"""
+        '''State size of the cell'''
         return self._state_size
 
     @property
     def output_size(self):
-        """Output size of the cell"""
+        '''Output size of the cell'''
         return self._output_size
 
     def __call__(self, inputs, state):
-        """Step once given the input and return score and next state"""
+        '''Step once given the input and return score and next state'''
         cell_state, fst_states, state_probs, num_fst_states = state
         cell_out, cell_state = self.dec_cell(inputs, cell_state)
 
         def fst_costs_env(states, probs, num, inp):
-            """Python function"""
+            '''Python function'''
             return fst_costs(states, probs, num, inp, self.fst, self.max_states)
 
         func_appl = tf.py_func(fst_costs_env,
@@ -51,7 +51,7 @@ class LMCellWrapper(tf.contrib.rnn.RNNCell):
         return fin_score, (cell_state, next_state, next_state_probs, next_num_states)
 
     def zero_state(self, batch_size, dtype):
-        """Zero state"""
+        '''Zero state'''
         return (self.dec_cell.zero_state(batch_size, dtype),
                 tf.zeros((batch_size, self.max_states), tf.int32),
                 tf.zeros((batch_size, self.max_states), tf.float32),

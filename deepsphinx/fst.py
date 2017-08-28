@@ -1,11 +1,11 @@
-"""Functions for FST calculation"""
+'''Functions for FST calculation'''
 from itertools import groupby
 import numpy as np
 
 from deepsphinx.vocab import VOCAB_TO_INT, VOCAB_SIZE
 
 def in_fst(fst, text):
-    """Checks weather a text is possible in fst"""
+    '''Checks weather a text is possible in fst'''
     states = [0]
     probs = [0.0]
     num_st = 1
@@ -21,12 +21,12 @@ def in_fst(fst, text):
         vocab_probs -= combine(vocab_probs)
         if num_st == 0:
             ret = False
-    # print("LM loss: ", scores / len(text), ret)
+    # print('LM loss: ', scores / len(text), ret)
     return ret
 
 
 def dfs_probs(state, prob, fst, probs_arr):
-    """Find all possible next states"""
+    '''Find all possible next states'''
     for arc in fst.arcs(state):
         cur_prob = prob - np.log(10) * np.float32(arc.weight.to_string())
         if arc.ilabel == VOCAB_TO_INT['<backoff>']:
@@ -35,7 +35,7 @@ def dfs_probs(state, prob, fst, probs_arr):
         probs_arr[arc.ilabel].append(cur_prob)
 
 def dfs_find(state, prob, fst, inp, out):
-    """Find next possible states with an input symbol"""
+    '''Find next possible states with an input symbol'''
     for arc in fst.arcs(state):
         cur_prob = prob - np.log(10) * np.float32(arc.weight.to_string())
         if arc.ilabel == VOCAB_TO_INT['<backoff>']:
@@ -46,7 +46,7 @@ def dfs_find(state, prob, fst, inp, out):
 
 
 def combine(probs):
-    """ Add various log probabilities"""
+    ''' Add various log probabilities'''
     if len(probs) == 0:
         return np.float32(-50.0)
     probs_max = np.max(probs)
@@ -54,8 +54,8 @@ def combine(probs):
 
 
 def fst_cost_single(poss_states, probs, num_fst_states, inp, fst, max_states):
-    """Calculate next state and their probabilites given an input symbol and
-    current possible states and their probabilites"""
+    '''Calculate next state and their probabilites given an input symbol and
+    current possible states and their probabilites'''
     # A very crude try
     if num_fst_states >= 1:
         probs[:num_fst_states] -= combine(probs[:num_fst_states])
@@ -81,8 +81,8 @@ def fst_cost_single(poss_states, probs, num_fst_states, inp, fst, max_states):
     return np.asarray(next_states), np.asarray(next_probs), num_states, np.asarray(probs_arr)
 
 def fst_costs(states, probs, num, inputs, fst, max_states):
-    """Calculate next state and their probabilites given an input symbol and
-    current possible states and their probabilites for a batch"""
+    '''Calculate next state and their probabilites given an input symbol and
+    current possible states and their probabilites for a batch'''
     next_states = np.zeros_like(states)
     next_probs = np.zeros_like(probs)
     next_num = np.zeros_like(num)

@@ -1,12 +1,12 @@
-"""Common utilities"""
+'''Common utilities'''
 import tensorflow as tf
 import numpy as np
 
 # https://github.com/zszyellow/WER-in-python/blob/master/wer.py
 def wer(first, second):
-    """This is a function that calculate the word error rate in ASR.
-    You can use it like this: wer("what is it".split(), "what is".split())
-    """
+    '''This is a function that calculate the word error rate in ASR.
+    You can use it like this: wer('what is it'.split(), 'what is'.split())
+    '''
     # build the matrix
     edit_dp = np.zeros(
         (len(first) + 1) * (len(second) + 1),
@@ -30,10 +30,10 @@ def wer(first, second):
             max(len(first), len(second)) * 100)
 
 class FileOpen(tf.gfile.Open):
-    """A custom class inheriting tf.gfile.Open for providing seek with whence
+    '''A custom class inheriting tf.gfile.Open for providing seek with whence
 
     Useful when using GCS
-    """
+    '''
     # pylint: disable=arguments-differ
 
     def seek(self, position, whence=0):

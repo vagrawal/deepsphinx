@@ -1,4 +1,4 @@
-"""Tensorflow model for speech recognition"""
+'''Tensorflow model for speech recognition'''
 import tensorflow as tf
 from deepsphinx.vocab import VOCAB_SIZE, VOCAB_TO_INT
 from deepsphinx.utils import FLAGS
@@ -9,7 +9,7 @@ def encoding_layer(
         input_lengths,
         rnn_inputs,
         keep_prob):
-    """ Encoding layer for the model.
+    ''' Encoding layer for the model.
 
     Args:
         input_lengths (Tensor): A tensor of input lenghts of instances in
@@ -18,7 +18,7 @@ def encoding_layer(
 
     Returns:
         Encoding output, LSTM state, output length
-    """
+    '''
     for layer in range(FLAGS.num_layers):
         with tf.variable_scope('encoder_{}'.format(layer)):
             cell_fw = tf.contrib.rnn.LSTMCell(
@@ -67,11 +67,11 @@ def get_dec_cell(
         fst,
         tile_size,
         keep_prob):
-    """Decoding cell for attention based model
+    '''Decoding cell for attention based model
 
     Return:
         `RNNCell` Instance
-    """
+    '''
 
     lstm = tf.contrib.rnn.LSTMCell(
         FLAGS.rnn_size,
@@ -135,11 +135,11 @@ def training_decoding_layer(
         enc_output_lengths,
         fst,
         keep_prob):
-    """ Training decoding layer for the model.
+    ''' Training decoding layer for the model.
 
     Returns:
         Training logits
-    """
+    '''
     target_data = tf.concat(
         [tf.fill([FLAGS.batch_size, 1], VOCAB_TO_INT['<s>']),
          target_data[:, :-1]], 1)
@@ -183,11 +183,11 @@ def inference_decoding_layer(
         enc_output_lengths,
         fst,
         keep_prob):
-    """ Inference decoding layer for the model.
+    ''' Inference decoding layer for the model.
 
     Returns:
         Predictions
-    """
+    '''
 
     dec_cell = get_dec_cell(
         enc_output,
@@ -228,19 +228,19 @@ def seq2seq_model(
         target_lengths,
         fst,
         keep_prob):
-    """ Attention based model
+    ''' Attention based model
 
     Returns:
         Logits, Predictions, Training operation, Cost, Step, Scores of beam
         search
-    """
+    '''
 
     enc_output, _, enc_lengths = encoding_layer(
         input_lengths,
         input_data,
         keep_prob)
 
-    with tf.variable_scope("decode"):
+    with tf.variable_scope('decode'):
 
         training_logits = training_decoding_layer(
             target_data,
@@ -249,7 +249,7 @@ def seq2seq_model(
             enc_lengths,
             fst,
             keep_prob)
-    with tf.variable_scope("decode", reuse=True):
+    with tf.variable_scope('decode', reuse=True):
         predictions = inference_decoding_layer(
             enc_output,
             enc_lengths,
@@ -274,7 +274,7 @@ def seq2seq_model(
         dtype=tf.float32,
         name='masks')
 
-    with tf.name_scope("optimization"):
+    with tf.name_scope('optimization'):
         # Loss function
         cost = tf.contrib.seq2seq.sequence_loss(
             training_logits,

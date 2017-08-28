@@ -1,8 +1,8 @@
-"""Vocabulary for the dataset"""
+'''Vocabulary for the dataset'''
 import numpy as np
 
 VOCAB = np.asarray(
-    ['<eps>', '<s>', '</s>'] + list(" '.-ABCDEFGHIJKLMNOPQRSTUVWXYZ") + ['<backoff>'])
+    ['<eps>', '<s>', '</s>'] + list(' \'.-ABCDEFGHIJKLMNOPQRSTUVWXYZ') + ['<backoff>'])
 VOCAB_TO_INT = {}
 
 for ch in VOCAB:
