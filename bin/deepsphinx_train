@@ -8,7 +8,7 @@ import tensorflow as tf
 from deepsphinx.seq2seq_model import seq2seq_model
 from deepsphinx.data import read_data_queue, get_speaker_stats
 from deepsphinx.vocab import VOCAB
-from deepsphinx.utils import FileOpen, wer, FLAGS
+from deepsphinx.utils import wer, FLAGS
 try:
     import pywrapfst as fst
 except ImportError:
@@ -99,7 +99,7 @@ def train(_):
         sets = ['eval', 'train']
 
     if FLAGS.use_train_lm or FLAGS.use_inference_lm:
-        lm_fst = fst.Fst.read_from_string(FileOpen(FLAGS.fst_path).read())
+        lm_fst = fst.Fst.read_from_string(tf.gfile.FastGFile(FLAGS.fst_path).read())
     else:
         lm_fst = None
 

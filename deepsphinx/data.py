@@ -5,13 +5,13 @@ import numpy as np
 from python_speech_features.base import fbank, delta
 import tensorflow as tf
 from deepsphinx.vocab import VOCAB_TO_INT
-from deepsphinx.utils import FileOpen, FLAGS
+from deepsphinx.utils import FLAGS
 from deepsphinx.fst import in_fst
 import soundfile as sf
 
 def get_features(audio_file):
     '''Get features from a file'''
-    signal, sample_rate = sf.read(audio_file)
+    signal, sample_rate = sf.read(tf.gfile.FastGFile(audio_file, 'rb'))
     feat, energy = fbank(signal, sample_rate, nfilt=FLAGS.nfilt)
     feat = np.log(feat)
     dfeat = delta(feat, 2)
@@ -22,7 +22,7 @@ def get_features(audio_file):
 def get_speaker_stats(set_ids):
     '''Get mean and variance of a speaker'''
     tf.logging.info('Getting speaker stats')
-    trans = FileOpen(FLAGS.trans_file).readlines()
+    trans = tf.gfile.FastGFile(FLAGS.trans_file).readlines()
     sum_speaker = {}
     sum_sq_speaker = {}
     count_speaker = {}
@@ -93,7 +93,7 @@ def read_data_thread(
         fst):
     '''Enqueue data to queue'''
 
-    trans = FileOpen(FLAGS.trans_file).readlines()
+    trans = tf.gfile.FastGFile(FLAGS.trans_file).readlines()
     random.shuffle(trans)
     for line in trans:
         line = line.strip()

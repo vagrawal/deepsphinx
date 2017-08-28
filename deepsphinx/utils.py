@@ -29,19 +29,4 @@ def wer(first, second):
     return (float(edit_dp[len(first)][len(second)]) /
             max(len(first), len(second)) * 100)
 
-class FileOpen(tf.gfile.Open):
-    '''A custom class inheriting tf.gfile.Open for providing seek with whence
-
-    Useful when using GCS
-    '''
-    # pylint: disable=arguments-differ
-
-    def seek(self, position, whence=0):
-        if whence == 0:
-            tf.gfile.Open.seek(self, position)
-        elif whence == 1:
-            tf.gfile.Open.seek(self, self.tell() + position)
-        else:
-            raise IOError
-
 FLAGS = tf.app.flags.FLAGS
