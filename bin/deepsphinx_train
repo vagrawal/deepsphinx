@@ -99,7 +99,7 @@ def train(_):
         sets = ['eval', 'train']
 
     if FLAGS.use_train_lm or FLAGS.use_inference_lm:
-        lm_fst = fst.Fst.read_from_string(tf.gfile.FastGFile(FLAGS.fst_path).read())
+        lm_fst = fst.Fst.read_from_string(tf.gfile.FastGFile(FLAGS.fst_path, 'rb').read())
     else:
         lm_fst = None
 
