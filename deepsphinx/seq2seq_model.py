@@ -51,10 +51,12 @@ def encoding_layer(
                 dtype=tf.float32)
 
             if layer != FLAGS.num_layers - 1:
-                rnn_inputs = tf.concat(enc_output, 2)
-                # Keep only every second element in the sequence
-                rnn_inputs = rnn_inputs[:, ::2, :]
-                input_lengths = (input_lengths + 1) // 2
+                rnn_inputs = tf.concat(enc_output,2)
+                filt = tf.get_variable(
+                    "conv_filter_{}".format(layer),
+                    shape = [2, 2 * FLAGS.rnn_size, FLAGS.rnn_size])
+                rnn_inputs = tf.nn.conv1d(rnn_inputs, filt, 2, 'SAME')
+                input_lengths = (input_lengths + 1) / 2
     # Join outputs since we are using a bidirectional RNN
     enc_output = tf.concat(enc_output, 2)
 
