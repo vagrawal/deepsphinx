@@ -8,6 +8,7 @@ from deepsphinx.vocab import VOCAB_TO_INT
 from deepsphinx.utils import FLAGS
 from deepsphinx.fst import in_fst
 import soundfile as sf
+import csv
 
 def get_features(audio_file):
     '''Get features from a file'''
@@ -26,9 +27,7 @@ def get_speaker_stats(set_ids):
     sum_speaker = {}
     sum_sq_speaker = {}
     count_speaker = {}
-    for line in trans:
-        line = line.strip()
-        _, set_id, speaker, audio_file = line.split('\\')
+    for _, set_id, speaker, audio_file in csv.reader(trans):
         if set_id in set_ids:
             n_feat = 3 * FLAGS.nfilt + 1
             if speaker not in sum_speaker:
@@ -95,9 +94,7 @@ def read_data_thread(
 
     trans = tf.gfile.FastGFile(FLAGS.trans_file).readlines()
     random.shuffle(trans)
-    for line in trans:
-        line = line.strip()
-        text, set_id_trans, speaker, audio_file = line.split('\\')
+    for text, set_id_trans, speaker, audio_file in csv.reader(trans):
         try:
             text = [VOCAB_TO_INT[c]
                     for c in list(text)] + [VOCAB_TO_INT['</s>']]
