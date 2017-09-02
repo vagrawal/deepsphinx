@@ -236,7 +236,7 @@ def train(_):
 
                 tf.logging.info("Epoch completed, saving")
                 FLAGS.checkpoint_path = saver.save(
-                    sess, checkpoint, step)
+                    sess, checkpoint + 'batch', step)
 
                 coord.request_stop()
 
