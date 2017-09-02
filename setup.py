@@ -4,7 +4,7 @@ setup(
     name='deepshinx',
     version='0.1',
     packages=['deepsphinx'],
-    scripts=['bin/deepsphinx_train'],
+    scripts=['bin/deepsphinx-train'],
     description='Trainer',
     # Replace with tensorflow-gpu if using GPU
     install_requires=['python_speech_features',

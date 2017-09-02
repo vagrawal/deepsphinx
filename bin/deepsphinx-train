@@ -267,4 +267,6 @@ if __name__ == "__main__":
     flags.DEFINE_string("trans-file", None, "Path of transcription file")
     flags.DEFINE_bool("use-inference-lm", False, "Use LM during inference")
     flags.DEFINE_bool("use-train-lm", False, "Use LM during training")
+    flags.DEFINE_bool("use-conv-feat-att", False, "Use convolutional features for attention")
+
     tf.app.run(train)

@@ -79,9 +79,10 @@ class BahdanauAttentionCutoff(tf.contrib.seq2seq.BahdanauAttention.__base__):
         dtype = tf.float32
         self.v = tf.get_variable(
             'attention_v', [self._num_units], dtype=dtype)
-        self.conv_filt = tf.get_variable(
-                'conv_filter',
-                shape = [200, 1, num_units])
+        if FLAGS.use_conv_feat_att:
+            self.conv_filt = tf.get_variable(
+                    'conv_filter',
+                    shape = [200, 1, num_units])
         if self._normalize:
             # Scalar used in weight normalization
             self.g = tf.get_variable(
@@ -111,9 +112,10 @@ class BahdanauAttentionCutoff(tf.contrib.seq2seq.BahdanauAttention.__base__):
             dtype = processed_query.dtype
             # Reshape from [batch_size, ...] to [batch_size, 1, ...] for broadcasting.
             processed_query = tf.expand_dims(processed_query, 1)
-            conv_feat = tf.nn.conv1d(
-                    tf.expand_dims(previous_alignments, 2),
-                    self.conv_filt, 1, 'SAME')
+            if FLAGS.use_conv_feat_att:
+                conv_feat = tf.nn.conv1d(
+                        tf.expand_dims(previous_alignments, 2),
+                        self.conv_filt, 1, 'SAME')
             keys = self._keys
             if self._normalize:
                 # normed_v = g * v / ||v||
@@ -122,8 +124,13 @@ class BahdanauAttentionCutoff(tf.contrib.seq2seq.BahdanauAttention.__base__):
                 score = tf.reduce_sum(
                     normed_v * tf.tanh(keys + processed_query + self.b), [2])
             else:
-                score = tf.reduce_sum(self.v * tf.tanh(keys + processed_query + conv_feat),
+                if FLAGS.use_conv_feat_att:
+                    score = tf.reduce_sum(self.v * tf.tanh(keys + processed_query + conv_feat),
                                       [2])
+                else:
+                    score = tf.reduce_sum(self.v * tf.tanh(keys + processed_query),
+                                      [2])
+
 
         alignments = self._probability_fn(score, previous_alignments)
         return alignments
