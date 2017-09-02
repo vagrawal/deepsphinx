@@ -1,0 +1,17 @@
+#!/usr/bin/env python
+# vim: filetype=python
+
+''' Make prediction for a given audio file '''
+from deepsphinx.api import Predict
+from deepsphinx.flags import load_flags
+from deepsphinx.utils import FLAGS
+import tensorflow as tf
+
+def infer(_):
+    # TODO: Use LM
+    print(Predict(FLAGS.checkpoint_path).predict(FLAGS.audio_file))
+
+if __name__ == "__main__":
+    tf.logging.set_verbosity(tf.logging.INFO)
+    load_flags('infer')
+    tf.app.run(infer)
