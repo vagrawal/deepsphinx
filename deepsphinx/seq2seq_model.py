@@ -19,6 +19,11 @@ def encoding_layer(
     Returns:
         Encoding output, LSTM state, output length
     '''
+    for layer in range(FLAGS.num_conv_layers):
+        filter = tf.get_variable(
+            "conv_filter{}".format(layer + 1),
+            shape=[FLAGS.conv_layer_width, rnn_inputs.get_shape()[2], FLAGS.conv_layer_size])
+        rnn_inputs = tf.nn.conv1d(rnn_inputs, filter, 1, 'SAME')
     for layer in range(FLAGS.num_layers):
         with tf.variable_scope('encoder_{}'.format(layer)):
             cell_fw = tf.contrib.rnn.LSTMCell(
