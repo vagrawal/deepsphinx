@@ -4,7 +4,7 @@ from deepsphinx.utils import FLAGS
 from deepsphinx.vocab import VOCAB, VOCAB_SIZE
 from deepsphinx.data import get_features
 import tensorflow as tf
-from flags import load_flags
+from deepsphinx.flags import load_flags
 import numpy as np
 
 class Predict(object):
