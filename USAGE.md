@@ -7,7 +7,8 @@ Data preparation
 Data contains transcripts file and audio files. The format of transcription
 file is csv in the form of `<transcript>,<set_id>,<speaker_id>,<file path>` for
 each transcript. If speaker ID is not available, any word(e.g `None`) can be
-used to normalize the features by complete dataset.
+used to normalize the features by complete dataset. `<set_id>` can be either
+`train` or `eval` defining training and validation data.
 
 To change the vocabulary, you need to edit the python code in `vocab.py`
 
