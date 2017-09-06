@@ -11,5 +11,7 @@ setup(
     install_requires=['python_speech_features',
                       'tensorflow==1.3.0',
                       'scipy',
-                      'pysoundfile',
-                      'openfst'])
+                      'pysoundfile'],
+    extras_require = {
+        'openfst':  ['openfst'],
+},)
