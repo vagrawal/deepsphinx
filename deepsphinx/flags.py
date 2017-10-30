@@ -20,7 +20,7 @@ def load_flags(mode = 'train'):
     flags.DEFINE_string('job-dir', './job/', 'Directory in which summary and checkpoint is stored')
     flags.DEFINE_string('checkpoint-path', None, 'Load a trained model')
     flags.DEFINE_integer('best-n-inference', 1, 'Take best of n for beam search')
-    flags.DEFINE_integer('eval-only', False, 'Only evaluate. --checkpoint-path is required')
+    flags.DEFINE_bool('eval-only', False, 'Only evaluate. --checkpoint-path is required')
     flags.DEFINE_string('fst-path', None, 'Path of language FST')
     flags.DEFINE_integer('cutoff-range', 100, 'Attention cutoff from previous mean range')
     flags.DEFINE_bool('use-inference-lm', False, 'Use LM during inference')
