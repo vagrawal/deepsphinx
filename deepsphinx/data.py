@@ -8,6 +8,7 @@ from deepsphinx.vocab import VOCAB_TO_INT
 from deepsphinx.utils import FLAGS
 from deepsphinx.fst import in_fst
 import soundfile as sf
+import pickle
 import csv
 
 def get_features(audio_file):
@@ -23,6 +24,10 @@ def get_features(audio_file):
 def get_speaker_stats(set_ids):
     '''Get mean and variance of a speaker'''
     tf.logging.info('Getting speaker stats')
+    try:
+        return pickle.load(open('stats.p','rb'))
+    except:
+        print('Stats file not found. Creating stats.p')
     trans = tf.gfile.FastGFile(FLAGS.trans_file).readlines()
     sum_speaker = {}
     sum_sq_speaker = {}
@@ -41,6 +46,7 @@ def get_speaker_stats(set_ids):
     mean = {k: sum_speaker[k] / count_speaker[k] for k, v in sum_speaker.items()}
     var = {k: sum_sq_speaker[k] / count_speaker[k] -
               np.square(mean[k]) for k, v in sum_speaker.items()}
+    pickle.dump((mean, var), open('stats.p', 'wb'))
     return mean, var
 
 
