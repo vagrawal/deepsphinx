@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(
-    name='deepshinx',
+    name='deepsphinx',
     version='0.1',
     packages=['deepsphinx'],
     scripts=['bin/deepsphinx-train',
