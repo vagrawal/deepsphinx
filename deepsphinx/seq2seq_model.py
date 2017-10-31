@@ -21,7 +21,7 @@ def encoding_layer(
     '''
     for layer in range(FLAGS.num_conv_layers):
         filter = tf.get_variable(
-            "conv_filter{}".format(layer + 1),
+            'conv_filter{}'.format(layer),
             shape=[FLAGS.conv_layer_width, rnn_inputs.get_shape()[2], FLAGS.conv_layer_size])
         rnn_inputs = tf.nn.conv1d(rnn_inputs, filter, 1, 'SAME')
     for layer in range(FLAGS.num_layers):

@@ -27,7 +27,7 @@ def get_speaker_stats(set_ids):
     try:
         return pickle.load(open('stats.p','rb'))
     except:
-        print('Stats file not found. Creating stats.p')
+        tf.logging.info('Stats file not found. Creating stats.p')
     trans = tf.gfile.FastGFile(FLAGS.trans_file).readlines()
     sum_speaker = {}
     sum_sq_speaker = {}
