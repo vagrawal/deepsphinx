@@ -96,13 +96,15 @@ def get_dec_cell(
 
     dec_cell_out = tf.contrib.rnn.LSTMCell(
         FLAGS.rnn_size,
-        num_proj=VOCAB_SIZE,
         initializer=tf.random_uniform_initializer(-0.1, 0.1, seed=2))
 
-    dec_cell = tf.contrib.rnn.MultiRNNCell(
-        [dec_cell_inp] +
-        [dec_cell] * (FLAGS.num_decoding_layers - 2) +
-        [dec_cell_out])
+    if (FLAGS.num_decoding_layers == 1):
+        dec_cell = tf.contrib.rnn.MultiRNNCell([dec_cell_inp])
+    else:
+        dec_cell = tf.contrib.rnn.MultiRNNCell(
+            [dec_cell_inp] +
+            [dec_cell] * (FLAGS.num_decoding_layers - 2) +
+            [dec_cell_out])
 
     enc_output = tf.contrib.seq2seq.tile_batch(
         enc_output,
@@ -116,7 +118,6 @@ def get_dec_cell(
         FLAGS.rnn_size,
         enc_output,
         enc_output_lengths,
-        normalize=True,
         name='BahdanauAttention')
 
     dec_cell = tf.contrib.seq2seq.AttentionWrapper(
