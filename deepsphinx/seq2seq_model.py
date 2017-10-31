@@ -290,14 +290,15 @@ def seq2seq_model(
 
         step = tf.contrib.framework.get_or_create_global_step()
 
+        vars = tf.trainable_variables()
+        lossL2 = tf.add_n([ tf.nn.l2_loss(v) for v in vars ]) * 0.000001
+
         # Optimizer
         optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
 
         # Gradient Clipping
         gradients = optimizer.compute_gradients(cost)
-        capped_gradients = [
-            (tf.clip_by_value(grad, -5., 5.), var)
-            for grad, var in gradients if grad is not None]
-        train_op = optimizer.apply_gradients(capped_gradients, step)
-
+        gradients, variables = zip(*optimizer.compute_gradients(cost + lossL2))
+        gradients, _ = tf.clip_by_global_norm(gradients, 1.0)
+        train_op = optimizer.apply_gradients(zip(gradients, variables), step)
     return training_logits, predictions, train_op, cost, step, scores
