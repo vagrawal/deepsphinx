@@ -199,6 +199,16 @@ def train():
                             tot_wer = 0.0
                             tot_cer = 0.0
 
+                            #run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+                            #run_metadata = tf.RunMetadata()
+                            #loss, _, batch_i = sess.run(
+                            #    [cost, train_op, step],
+                            #    feed_dict={learning_rate_tensor: lr,
+                            #               keep_prob_tensor: FLAGS.keep_prob},
+                            #    options=run_options,
+                            #    run_metadata=run_metadata)
+                            #writer.add_run_metadata(run_metadata, 'step%d' % batch_i)
+
                             pred, out, out_len = sess.run(
                                 [predictions, outputs, output_lengths],
                                 feed_dict={keep_prob_tensor: 1.0})
