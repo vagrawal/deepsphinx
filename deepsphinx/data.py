@@ -10,7 +10,11 @@ from deepsphinx.fst import in_fst
 import soundfile as sf
 import pickle
 import csv
+from joblib import Memory
 
+memory = Memory(cachedir='/home/ubuntu/data2/cache/', verbose=0)
+
+@memory.cache
 def get_features(audio_file):
     '''Get features from a file'''
     signal, sample_rate = sf.read(tf.gfile.FastGFile(audio_file, 'rb'))
