@@ -90,7 +90,7 @@ def run_eval(graph,
     tf.logging.info('Evaluation finished')
 
 
-def train(_):
+def train():
     '''Train the model and evaluate at every epoch'''
 
     checkpoint = os.path.join(FLAGS.job_dir, 'checkpoints/')
@@ -246,4 +246,7 @@ def train(_):
 if __name__ == '__main__':
     tf.logging.set_verbosity(tf.logging.INFO)
     load_flags()
-    tf.app.run(train)
+    unparsed = tf.flags.FLAGS._parse_flags()
+    if unparsed:
+        tf.logging.info('Unparsed flags: {}'.format(unparsed))
+    train()
