@@ -28,8 +28,7 @@ def encoding_layer(
         with tf.variable_scope('encoder_{}'.format(layer)):
             cell_fw = tf.contrib.rnn.LSTMCell(
                 FLAGS.rnn_size,
-                initializer=tf.random_uniform_initializer(
-                    -0.1, 0.1, seed=2))
+                initializer=tf.random_uniform_initializer(-0.1, 0.1))
             cell_fw = tf.contrib.rnn.DropoutWrapper(
                 cell_fw,
                 output_keep_prob=keep_prob,
@@ -39,8 +38,7 @@ def encoding_layer(
 
             cell_bw = tf.contrib.rnn.LSTMCell(
                 FLAGS.rnn_size,
-                initializer=tf.random_uniform_initializer(
-                    -0.1, 0.1, seed=2))
+                initializer=tf.random_uniform_initializer(-0.1, 0.1))
             cell_bw = tf.contrib.rnn.DropoutWrapper(
                 cell_bw,
                 output_keep_prob=keep_prob,
@@ -79,7 +77,7 @@ def get_dec_cell(
 
     lstm = tf.contrib.rnn.LSTMCell(
         FLAGS.rnn_size,
-        initializer=tf.random_uniform_initializer(-0.1, 0.1, seed=2))
+        initializer=tf.random_uniform_initializer(-0.1, 0.1))
     dec_cell_inp = tf.contrib.rnn.DropoutWrapper(
         lstm,
         output_keep_prob=keep_prob,
@@ -87,7 +85,7 @@ def get_dec_cell(
         dtype=tf.float32)
     lstm = tf.contrib.rnn.LSTMCell(
         FLAGS.rnn_size,
-        initializer=tf.random_uniform_initializer(-0.1, 0.1, seed=2))
+        initializer=tf.random_uniform_initializer(-0.1, 0.1))
     dec_cell = tf.contrib.rnn.DropoutWrapper(
         lstm,
         output_keep_prob=keep_prob,
@@ -96,7 +94,7 @@ def get_dec_cell(
 
     dec_cell_out = tf.contrib.rnn.LSTMCell(
         FLAGS.rnn_size,
-        initializer=tf.random_uniform_initializer(-0.1, 0.1, seed=2))
+        initializer=tf.random_uniform_initializer(-0.1, 0.1))
 
     if (FLAGS.num_decoding_layers == 1):
         dec_cell = tf.contrib.rnn.MultiRNNCell([dec_cell_inp])
