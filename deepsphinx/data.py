@@ -2,7 +2,7 @@
 import threading
 import random
 import numpy as np
-from python_speech_features.base import fbank, delta
+from python_speech_features.base import mfcc, delta
 import tensorflow as tf
 from deepsphinx.vocab import VOCAB_TO_INT
 from deepsphinx.utils import FLAGS
@@ -18,12 +18,10 @@ memory = Memory(cachedir='/home/ubuntu/data2/cache/', verbose=0)
 def get_features(audio_file):
     '''Get features from a file'''
     signal, sample_rate = sf.read(tf.gfile.FastGFile(audio_file, 'rb'))
-    feat, energy = fbank(signal, sample_rate, nfilt=FLAGS.nfilt)
-    feat = np.log(feat)
+    feat = mfcc(signal, sample_rate)
     dfeat = delta(feat, 2)
     ddfeat = delta(dfeat, 2)
-    return np.concatenate([feat, dfeat, ddfeat, np.expand_dims(energy, 1)],
-                          axis=1)
+    return np.concatenate([feat, dfeat, ddfeat], axis=1)
 
 def get_speaker_stats(set_ids):
     '''Get mean and variance of a speaker'''
@@ -38,7 +36,7 @@ def get_speaker_stats(set_ids):
     count_speaker = {}
     for _, set_id, speaker, audio_file in csv.reader(trans):
         if set_id in set_ids:
-            n_feat = 3 * FLAGS.nfilt + 1
+            n_feat = 3 * FLAGS.nfilt
             if speaker not in sum_speaker:
                 sum_speaker[speaker] = np.zeros(n_feat)
                 sum_sq_speaker[speaker] = np.zeros(n_feat)
@@ -62,7 +60,7 @@ def read_data_queue(
         var_speaker,
         fst):
     '''Start a thread to add data in a queue'''
-    input_data = tf.placeholder(dtype=tf.float32, shape=[None, FLAGS.nfilt * 3 + 1])
+    input_data = tf.placeholder(dtype=tf.float32, shape=[None, FLAGS.nfilt * 3])
     input_length = tf.placeholder(dtype=tf.int32, shape=[])
     output_data = tf.placeholder(dtype=tf.int32, shape=[None])
     output_length = tf.placeholder(dtype=tf.int32, shape=[])
