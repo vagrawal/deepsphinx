@@ -103,7 +103,7 @@ def read_data_thread(
     '''Enqueue data to queue'''
 
     trans = tf.gfile.FastGFile(FLAGS.trans_file).readlines()
-    random.shuffle(trans)
+    #random.shuffle(trans)
     for text, set_id_trans, speaker, audio_file in csv.reader(trans):
         try:
             text = [VOCAB_TO_INT[c]
