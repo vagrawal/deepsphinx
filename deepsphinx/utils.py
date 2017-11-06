@@ -3,7 +3,7 @@ import tensorflow as tf
 import numpy as np
 
 # https://github.com/zszyellow/WER-in-python/blob/master/wer.py
-def wer(ref, hyp):
+def edit_distance(ref, hyp):
     '''This is a function that calculate the word error rate in ASR.
     You can use it like this: wer('what is it'.split(), 'what is'.split())
     '''
@@ -26,6 +26,6 @@ def wer(ref, hyp):
                 insert = edit_dp[i][j - 1] + 1
                 delete = edit_dp[i - 1][j] + 1
                 edit_dp[i][j] = min(substitute, insert, delete)
-    return float(edit_dp[len(ref)][len(hyp)]) / len(ref) * 100
+    return edit_dp[len(ref)][len(hyp)]
 
 FLAGS = tf.app.flags.FLAGS
