@@ -29,22 +29,24 @@ def encoding_layer(
             cell_fw = tf.contrib.rnn.LSTMCell(
                 FLAGS.rnn_size,
                 initializer=tf.random_uniform_initializer(-0.1, 0.1))
-            cell_fw = tf.contrib.rnn.DropoutWrapper(
-                cell_fw,
-                output_keep_prob=keep_prob,
-                variational_recurrent=True,
-                dtype=tf.float32,
-                input_size=rnn_inputs.get_shape()[2])
+            if layer != FLAGS.num_layers - 1:
+                cell_fw = tf.contrib.rnn.DropoutWrapper(
+                    cell_fw,
+                    output_keep_prob=keep_prob,
+                    variational_recurrent=True,
+                    dtype=tf.float32,
+                    input_size=rnn_inputs.get_shape()[2])
 
             cell_bw = tf.contrib.rnn.LSTMCell(
                 FLAGS.rnn_size,
                 initializer=tf.random_uniform_initializer(-0.1, 0.1))
-            cell_bw = tf.contrib.rnn.DropoutWrapper(
-                cell_bw,
-                output_keep_prob=keep_prob,
-                variational_recurrent=True,
-                dtype=tf.float32,
-                input_size=rnn_inputs.get_shape()[2])
+            if layer != FLAGS.num_layers - 1:
+                cell_bw = tf.contrib.rnn.DropoutWrapper(
+                    cell_bw,
+                    output_keep_prob=keep_prob,
+                    variational_recurrent=True,
+                    dtype=tf.float32,
+                    input_size=rnn_inputs.get_shape()[2])
 
             enc_output, enc_state = tf.nn.bidirectional_dynamic_rnn(
                 cell_fw,
@@ -97,7 +99,7 @@ def get_dec_cell(
         initializer=tf.random_uniform_initializer(-0.1, 0.1))
 
     if (FLAGS.num_decoding_layers == 1):
-        dec_cell = tf.contrib.rnn.MultiRNNCell([dec_cell_inp])
+        dec_cell = tf.contrib.rnn.MultiRNNCell([dec_cell_out])
     else:
         dec_cell = tf.contrib.rnn.MultiRNNCell(
             [dec_cell_inp] +
