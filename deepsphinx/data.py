@@ -29,7 +29,7 @@ def get_speaker_stats(set_ids):
     '''Get mean and variance of a speaker'''
     tf.logging.info('Getting speaker stats')
     try:
-        return pickle.load(open('stats.p','rb'))
+        return pickle.load(open('stats.p','rb'), encoding='latin1')
     except:
         tf.logging.info('Stats file not found. Creating stats.p')
     trans = tf.gfile.FastGFile(FLAGS.trans_file).readlines()
@@ -103,7 +103,7 @@ def read_data_thread(
     '''Enqueue data to queue'''
 
     trans = tf.gfile.FastGFile(FLAGS.trans_file).readlines()
-    #random.shuffle(trans)
+    random.shuffle(trans)
     for text, set_id_trans, speaker, audio_file in csv.reader(trans):
         try:
             text = [VOCAB_TO_INT[c]

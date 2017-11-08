@@ -98,6 +98,12 @@ def get_dec_cell(
         FLAGS.rnn_size,
         initializer=tf.random_uniform_initializer(-0.1, 0.1))
 
+    dec_cell_out = tf.contrib.rnn.DropoutWrapper(
+        dec_cell_out,
+        output_keep_prob=keep_prob,
+        variational_recurrent=True,
+        dtype=tf.float32)
+
     if (FLAGS.num_decoding_layers == 1):
         dec_cell = tf.contrib.rnn.MultiRNNCell([dec_cell_out])
     else:
@@ -232,13 +238,17 @@ def seq2seq_model(
         input_lengths,
         target_lengths,
         fst,
-        keep_prob):
+        keep_prob,
+        noise_std):
     ''' Attention based model
 
     Returns:
         Logits, Predictions, Training operation, Cost, Step, Scores of beam
         search
     '''
+    input_sh = tf.shape(input_data)
+    input_data = input_data + tf.random_normal(shape=input_sh, mean=0.0, stddev=noise_std)
+    print(input_data)
 
     enc_output, _, enc_lengths = encoding_layer(
         input_lengths,
@@ -246,7 +256,6 @@ def seq2seq_model(
         keep_prob)
 
     with tf.variable_scope('decode'):
-
         training_logits = training_decoding_layer(
             target_data,
             target_lengths,
@@ -288,7 +297,7 @@ def seq2seq_model(
 
         tf.summary.scalar('cost', cost)
 
-        step = tf.contrib.framework.get_or_create_global_step()
+        step = tf.train.get_or_create_global_step()
 
         vars = tf.trainable_variables()
         lossL2 = tf.add_n([ tf.nn.l2_loss(v) for v in vars ]) * 0.000001
