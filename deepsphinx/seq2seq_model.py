@@ -4,11 +4,13 @@ from deepsphinx.vocab import VOCAB_SIZE, VOCAB_TO_INT
 from deepsphinx.utils import FLAGS
 from deepsphinx.lm import LMCellWrapper
 from deepsphinx.attention import BahdanauAttentionCutoff
+from deepsphinx.LSTM import LSTMCell
 
 def encoding_layer(
         input_lengths,
         rnn_inputs,
-        keep_prob):
+        keep_prob,
+        noise_std):
     ''' Encoding layer for the model.
 
     Args:
@@ -26,9 +28,10 @@ def encoding_layer(
         rnn_inputs = tf.nn.conv1d(rnn_inputs, filter, 1, 'SAME')
     for layer in range(FLAGS.num_layers):
         with tf.variable_scope('encoder_{}'.format(layer)):
-            cell_fw = tf.contrib.rnn.LSTMCell(
+            cell_fw = LSTMCell(
                 FLAGS.rnn_size,
-                initializer=tf.random_uniform_initializer(-0.1, 0.1))
+                initializer=tf.random_uniform_initializer(-0.1, 0.1),
+                noise_std=noise_std)
             if layer != FLAGS.num_layers - 1:
                 cell_fw = tf.contrib.rnn.DropoutWrapper(
                     cell_fw,
@@ -37,9 +40,10 @@ def encoding_layer(
                     dtype=tf.float32,
                     input_size=rnn_inputs.get_shape()[2])
 
-            cell_bw = tf.contrib.rnn.LSTMCell(
+            cell_bw = LSTMCell(
                 FLAGS.rnn_size,
-                initializer=tf.random_uniform_initializer(-0.1, 0.1))
+                initializer=tf.random_uniform_initializer(-0.1, 0.1),
+                noise_std=noise_std)
             if layer != FLAGS.num_layers - 1:
                 cell_bw = tf.contrib.rnn.DropoutWrapper(
                     cell_bw,
@@ -70,33 +74,40 @@ def get_dec_cell(
         use_lm,
         fst,
         tile_size,
-        keep_prob):
+        keep_prob,
+        noise_std):
     '''Decoding cell for attention based model
 
     Return:
         `RNNCell` Instance
     '''
 
-    lstm = tf.contrib.rnn.LSTMCell(
+    lstm = LSTMCell(
         FLAGS.rnn_size,
-        initializer=tf.random_uniform_initializer(-0.1, 0.1))
+        initializer=tf.random_uniform_initializer(-0.1, 0.1),
+        noise_std=noise_std,
+        tile_size=tile_size)
     dec_cell_inp = tf.contrib.rnn.DropoutWrapper(
         lstm,
         output_keep_prob=keep_prob,
         variational_recurrent=True,
         dtype=tf.float32)
-    lstm = tf.contrib.rnn.LSTMCell(
+    lstm = LSTMCell(
         FLAGS.rnn_size,
-        initializer=tf.random_uniform_initializer(-0.1, 0.1))
+        initializer=tf.random_uniform_initializer(-0.1, 0.1),
+        noise_std=noise_std,
+        tile_size=tile_size)
     dec_cell = tf.contrib.rnn.DropoutWrapper(
         lstm,
         output_keep_prob=keep_prob,
         variational_recurrent=True,
         dtype=tf.float32)
 
-    dec_cell_out = tf.contrib.rnn.LSTMCell(
+    dec_cell_out = LSTMCell(
         FLAGS.rnn_size,
-        initializer=tf.random_uniform_initializer(-0.1, 0.1))
+        initializer=tf.random_uniform_initializer(-0.1, 0.1),
+        noise_std=noise_std,
+        tile_size=tile_size)
 
     dec_cell_out = tf.contrib.rnn.DropoutWrapper(
         dec_cell_out,
@@ -145,7 +156,8 @@ def training_decoding_layer(
         enc_output,
         enc_output_lengths,
         fst,
-        keep_prob):
+        keep_prob,
+        noise_std):
     ''' Training decoding layer for the model.
 
     Returns:
@@ -161,7 +173,8 @@ def training_decoding_layer(
         FLAGS.use_train_lm,
         fst,
         1,
-        keep_prob)
+        keep_prob,
+        noise_std)
 
     initial_state = dec_cell.zero_state(
         dtype=tf.float32,
@@ -193,7 +206,8 @@ def inference_decoding_layer(
         enc_output,
         enc_output_lengths,
         fst,
-        keep_prob):
+        keep_prob,
+        noise_std):
     ''' Inference decoding layer for the model.
 
     Returns:
@@ -206,7 +220,8 @@ def inference_decoding_layer(
         FLAGS.use_inference_lm,
         fst,
         FLAGS.beam_width,
-        keep_prob)
+        keep_prob,
+        noise_std)
 
     initial_state = dec_cell.zero_state(
         dtype=tf.float32,
@@ -246,14 +261,14 @@ def seq2seq_model(
         Logits, Predictions, Training operation, Cost, Step, Scores of beam
         search
     '''
-    input_sh = tf.shape(input_data)
-    input_data = input_data + tf.random_normal(shape=input_sh, mean=0.0, stddev=noise_std)
-    print(input_data)
+    #input_sh = tf.shape(input_data)
+    #input_data = input_data + tf.random_normal(shape=input_sh, mean=0.0, stddev=noise_std)
 
     enc_output, _, enc_lengths = encoding_layer(
         input_lengths,
         input_data,
-        keep_prob)
+        keep_prob,
+        noise_std)
 
     with tf.variable_scope('decode'):
         training_logits = training_decoding_layer(
@@ -262,13 +277,15 @@ def seq2seq_model(
             enc_output,
             enc_lengths,
             fst,
-            keep_prob)
+            keep_prob,
+            noise_std)
     with tf.variable_scope('decode', reuse=True):
         predictions = inference_decoding_layer(
             enc_output,
             enc_lengths,
             fst,
-            keep_prob)
+            keep_prob,
+            noise_std)
 
     # Create tensors for the training logits and predictions
     training_logits = tf.identity(
