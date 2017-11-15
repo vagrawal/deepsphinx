@@ -39,9 +39,7 @@ class LSTMCell(tf.contrib.rnn.RNNCell):
             #hidden = tf.squeeze(hidden)
 
             inp = tf.concat([inputs, h], 1)
-            print(inp)
-            std_mult = tf.sqrt(tf.sqrt(tf.reduce_sum(inp * inp, 1)))
-            print(std_mult)
+            std_mult = tf.sqrt(tf.reduce_sum(inp * inp, 1))
             
             hidden = tf.matmul(inp, W_both) + bias
             hidden = hidden + self.random_noise * tf.expand_dims(std_mult, 1)

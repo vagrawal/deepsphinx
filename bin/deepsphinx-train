@@ -193,7 +193,7 @@ def train():
                         loss, _, batch_i = sess.run(
                             [cost, train_op, step],
                             feed_dict={learning_rate_tensor: lr,
-                                       noise_std: 0.1,
+                                       noise_std: 0.075,
                                        keep_prob_tensor: FLAGS.keep_prob})
                         train_i += 1
 

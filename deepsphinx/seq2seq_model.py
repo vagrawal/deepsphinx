@@ -317,7 +317,7 @@ def seq2seq_model(
         step = tf.train.get_or_create_global_step()
 
         vars = tf.trainable_variables()
-        lossL2 = tf.add_n([ tf.nn.l2_loss(v) for v in vars ]) * 0.000001
+        lossL2 = tf.add_n([ tf.nn.l2_loss(v) for v in vars ]) * 0.00000001
 
         # Optimizer
         optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
