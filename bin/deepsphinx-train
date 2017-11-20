@@ -133,7 +133,7 @@ def train():
             input_lengths,
             output_lengths,
             lm_fst,
-            keep_prob_tensor,
+            1.0, #keep_prob_tensor,
             noise_std)
 
         writer = tf.summary.FileWriter(FLAGS.job_dir)
