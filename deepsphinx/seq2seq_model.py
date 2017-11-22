@@ -1,10 +1,11 @@
 '''Tensorflow model for speech recognition'''
 import tensorflow as tf
-from deepsphinx.vocab import VOCAB_SIZE, VOCAB_TO_INT
+from deepsphinx.vocab import VOCAB_SIZE, VOCAB_TO_INT, VOCAB
 from deepsphinx.utils import FLAGS
 from deepsphinx.lm import LMCellWrapper
 from deepsphinx.attention import BahdanauAttentionCutoff
 from deepsphinx.LSTM import LSTMCell
+import numpy as np
 
 def encoding_layer(
         input_lengths,
@@ -157,14 +158,15 @@ def training_decoding_layer(
         enc_output_lengths,
         fst,
         keep_prob,
-        noise_std):
+        noise_std,
+        tile_size):
     ''' Training decoding layer for the model.
 
     Returns:
         Training logits
     '''
     target_data = tf.concat(
-        [tf.fill([FLAGS.batch_size, 1], VOCAB_TO_INT['<s>']),
+        [tf.fill([FLAGS.batch_size * tile_size, 1], VOCAB_TO_INT['<s>']),
          target_data[:, :-1]], 1)
 
     dec_cell = get_dec_cell(
@@ -172,13 +174,13 @@ def training_decoding_layer(
         enc_output_lengths,
         FLAGS.use_train_lm,
         fst,
-        1,
+        tile_size,
         keep_prob,
         noise_std)
 
     initial_state = dec_cell.zero_state(
         dtype=tf.float32,
-        batch_size=FLAGS.batch_size)
+        batch_size=FLAGS.batch_size * tile_size)
 
     target_data = tf.nn.embedding_lookup(
         tf.eye(VOCAB_SIZE),
@@ -273,24 +275,26 @@ def sampling_decoding_layer(
         batch_size=FLAGS.batch_size * FLAGS.beam_width)
 
     start_tokens = tf.fill(
-        [FLAGS.batch_size],
+        [FLAGS.batch_size * FLAGS.beam_width],
         VOCAB_TO_INT['<s>'],
         name='start_tokens')
 
-    inference_decoder = tf.contrib.seq2seq.SampleEmbeddingHelper(
-        dec_cell,
+    sample_helper = tf.contrib.seq2seq.SampleEmbeddingHelper(
         tf.eye(VOCAB_SIZE),
         start_tokens,
-        VOCAB_TO_INT['</s>'],
-        initial_state,
-        FLAGS.beam_width)
+        VOCAB_TO_INT['</s>'])
 
-    predictions, _, _ = tf.contrib.seq2seq.dynamic_decode(
-        inference_decoder,
+    sample_decoder = tf.contrib.seq2seq.BasicDecoder(
+        dec_cell,
+        sample_helper,
+        initial_state)
+
+    predictions, _, pred_len = tf.contrib.seq2seq.dynamic_decode(
+        sample_decoder,
         output_time_major=False,
         maximum_iterations=FLAGS.max_output_len)
 
-    return predictions
+    return predictions, pred_len
 
 def seq2seq_model(
         input_data,
@@ -323,7 +327,8 @@ def seq2seq_model(
             enc_lengths,
             fst,
             keep_prob,
-            noise_std)
+            noise_std,
+            1)
     with tf.variable_scope('decode', reuse=True):
         predictions = inference_decoding_layer(
             enc_output,
@@ -331,6 +336,45 @@ def seq2seq_model(
             fst,
             keep_prob,
             noise_std)
+    with tf.variable_scope('decode', reuse=True):
+        samples, sample_lengths = sampling_decoding_layer(
+            enc_output,
+            enc_lengths,
+            fst,
+            keep_prob,
+            noise_std)
+    with tf.variable_scope('decode', reuse=True):
+        sample_training_logits = training_decoding_layer(
+            samples.sample_id,
+            sample_lengths,
+            enc_output,
+            enc_lengths,
+            fst,
+            keep_prob,
+            noise_std,
+            FLAGS.beam_width)
+    mask_sample = tf.sequence_mask(
+        sample_lengths,
+        tf.reduce_max(sample_lengths),
+        dtype=tf.float32,
+        name='masks')
+    log_sample = tf.contrib.seq2seq.sequence_loss(
+        sample_training_logits.rnn_output,
+        samples.sample_id,
+        mask_sample,
+        average_across_batch=False)
+    def dLoss(true, pred):
+        ret = []
+#        for i in range(true.shape[0]):
+
+        #print('\n'.join([''.join([VOCAB[c] for c in row]) for row in true]))
+        #print('\n'.join([''.join([VOCAB[c] for c in row]) for row in pred]))
+        return np.zeros(pred.shape[0], 'float32')
+    cost_sample = tf.py_func(dLoss, [target_data, samples.sample_id], 'float32')
+    cost_sample = tf.reshape(cost_sample, [FLAGS.batch_size * FLAGS.beam_width])
+    cost_sample = cost_sample * log_sample
+    cost_sample = tf.reduce_mean(cost_sample)
+    cost_sample = tf.Print(cost_sample, [cost_sample])
 
     # Create tensors for the training logits and predictions
     training_logits = tf.identity(
@@ -369,7 +413,7 @@ def seq2seq_model(
 
         # Gradient Clipping
         gradients = optimizer.compute_gradients(cost)
-        gradients, variables = zip(*optimizer.compute_gradients(cost + lossL2))
+        gradients, variables = zip(*optimizer.compute_gradients(cost + lossL2 + cost_sample))
         gradients, _ = tf.clip_by_global_norm(gradients, 1.0)
         train_op = optimizer.apply_gradients(zip(gradients, variables), step)
     return training_logits, predictions, train_op, cost, step, scores
