@@ -196,6 +196,7 @@ def train():
                                        noise_std: 0.075,
                                        keep_prob_tensor: FLAGS.keep_prob})
                         train_i += 1
+                        #tf.logging.info('Loss: {}'.format(loss))
 
                         batch_loss += loss
 

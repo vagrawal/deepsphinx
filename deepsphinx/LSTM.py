@@ -10,7 +10,7 @@ class LSTMCell(tf.contrib.rnn.RNNCell):
         self.num_units = num_units
         self.forget_bias = forget_bias
         self.noise_std = noise_std
-        self.random_noise = tf.random_normal([tile_size * FLAGS.batch_size, 4 * num_units], stddev = self.noise_std)
+        #self.random_noise = tf.random_normal([tile_size * FLAGS.batch_size, 4 * num_units], stddev = self.noise_std)
 
     @property
     def state_size(self):
@@ -42,7 +42,7 @@ class LSTMCell(tf.contrib.rnn.RNNCell):
             std_mult = tf.sqrt(tf.reduce_sum(inp * inp, 1))
             
             hidden = tf.matmul(inp, W_both) + bias
-            hidden = hidden + self.random_noise * tf.expand_dims(std_mult, 1)
+            #hidden = hidden + self.random_noise * tf.expand_dims(std_mult, 1)
 
             i, j, f, o = tf.split(hidden, 4, 1)
 

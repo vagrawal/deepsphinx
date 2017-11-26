@@ -1,7 +1,7 @@
 '''Tensorflow model for speech recognition'''
 import tensorflow as tf
 from deepsphinx.vocab import VOCAB_SIZE, VOCAB_TO_INT, VOCAB
-from deepsphinx.utils import FLAGS
+from deepsphinx.utils import FLAGS, edit_distance
 from deepsphinx.lm import LMCellWrapper
 from deepsphinx.attention import BahdanauAttentionCutoff
 from deepsphinx.LSTM import LSTMCell
@@ -363,18 +363,28 @@ def seq2seq_model(
         samples.sample_id,
         mask_sample,
         average_across_batch=False)
-    def dLoss(true, pred):
+    def seq_loss(true, pred):
         ret = []
-#        for i in range(true.shape[0]):
-
+        lens = []
         #print('\n'.join([''.join([VOCAB[c] for c in row]) for row in true]))
         #print('\n'.join([''.join([VOCAB[c] for c in row]) for row in pred]))
+        for i in range(pred.shape[0]):
+            true_sen = true[i // FLAGS.beam_width].tolist()
+            true_sen = true_sen[:true_sen.index(VOCAB_TO_INT['</s>'])]
+            pred_sen = pred[i].tolist()
+            pred_sen = pred_sen[:pred_sen.index(VOCAB_TO_INT['</s>'])]
+            #print(''.join([VOCAB[c] for c in true_sen]))
+            #print(''.join([VOCAB[c] for c in pred_sen]))
+            ret.append(edit_distance(true_sen, pred_sen))
+            lens.append(len(true_sen))
+        ret = np.array(ret, dtype='float32')
+        lens = np.array(lens, dtype='float32')
+        ret = ret - np.mean(ret / lens) * lens
+        return ret
         return np.zeros(pred.shape[0], 'float32')
-    cost_sample = tf.py_func(dLoss, [target_data, samples.sample_id], 'float32')
+    cost_sample = tf.py_func(seq_loss, [target_data, samples.sample_id], 'float32', stateful=False)
     cost_sample = tf.reshape(cost_sample, [FLAGS.batch_size * FLAGS.beam_width])
-    cost_sample = cost_sample * log_sample
-    cost_sample = tf.reduce_mean(cost_sample)
-    cost_sample = tf.Print(cost_sample, [cost_sample])
+    cost_sample = tf.reduce_mean(cost_sample * log_sample)
 
     # Create tensors for the training logits and predictions
     training_logits = tf.identity(
@@ -413,7 +423,7 @@ def seq2seq_model(
 
         # Gradient Clipping
         gradients = optimizer.compute_gradients(cost)
-        gradients, variables = zip(*optimizer.compute_gradients(cost + lossL2 + cost_sample))
+        gradients, variables = zip(*optimizer.compute_gradients(cost_sample))
         gradients, _ = tf.clip_by_global_norm(gradients, 1.0)
         train_op = optimizer.apply_gradients(zip(gradients, variables), step)
     return training_logits, predictions, train_op, cost, step, scores
