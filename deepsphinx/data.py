@@ -108,7 +108,7 @@ def read_data_thread(
                     for c in list(text)] + [VOCAB_TO_INT['</s>']]
         except KeyError:
             continue
-        if (set_id == set_id_trans and
+        if (len(text) < 100 and set_id == set_id_trans and
                 ((not FLAGS.use_train_lm) or in_fst(fst, text))):
             feat = get_features(audio_file)
             feat = feat - mean_speaker[speaker]

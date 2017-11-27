@@ -342,7 +342,7 @@ def seq2seq_model(
             enc_lengths,
             fst,
             keep_prob,
-            noise_std)
+            0.0)
     with tf.variable_scope('decode', reuse=True):
         sample_training_logits = training_decoding_layer(
             samples.sample_id,
@@ -358,7 +358,7 @@ def seq2seq_model(
         tf.reduce_max(sample_lengths),
         dtype=tf.float32,
         name='masks')
-    log_sample = tf.contrib.seq2seq.sequence_loss(
+    log_sample = -tf.contrib.seq2seq.sequence_loss(
         sample_training_logits.rnn_output,
         samples.sample_id,
         mask_sample,
@@ -370,18 +370,23 @@ def seq2seq_model(
         #print('\n'.join([''.join([VOCAB[c] for c in row]) for row in pred]))
         for i in range(pred.shape[0]):
             true_sen = true[i // FLAGS.beam_width].tolist()
-            true_sen = true_sen[:true_sen.index(VOCAB_TO_INT['</s>'])]
+            if VOCAB_TO_INT['</s>'] in true_sen:
+                true_sen = true_sen[:true_sen.index(VOCAB_TO_INT['</s>'])]
+            #true_sen = ''.join([VOCAB[c] for c in true_sen]).split()
             pred_sen = pred[i].tolist()
-            pred_sen = pred_sen[:pred_sen.index(VOCAB_TO_INT['</s>'])]
+            if VOCAB_TO_INT['</s>'] in pred_sen:
+                pred_sen = pred_sen[:pred_sen.index(VOCAB_TO_INT['</s>'])]
+            #pred_sen =''.join([VOCAB[c] for c in pred_sen]).split()
             #print(''.join([VOCAB[c] for c in true_sen]))
             #print(''.join([VOCAB[c] for c in pred_sen]))
-            ret.append(edit_distance(true_sen, pred_sen))
-            lens.append(len(true_sen))
+            ret.append(float(edit_distance(true_sen, pred_sen)))
+            lens.append(float(len(true_sen)))
         ret = np.array(ret, dtype='float32')
         lens = np.array(lens, dtype='float32')
-        ret = ret - np.mean(ret / lens) * lens
-        return ret
-        return np.zeros(pred.shape[0], 'float32')
+        tf.logging.info('Sampling loss: {}'.format(np.sum(ret) / np.sum(lens)))
+        ret = ret.reshape((-1, FLAGS.beam_width))
+        ret = ret - ret.mean(axis=1, keepdims=True)
+        return ret.reshape((-1))
     cost_sample = tf.py_func(seq_loss, [target_data, samples.sample_id], 'float32', stateful=False)
     cost_sample = tf.reshape(cost_sample, [FLAGS.batch_size * FLAGS.beam_width])
     cost_sample = tf.reduce_mean(cost_sample * log_sample)
