@@ -104,13 +104,13 @@ def read_data_thread(
 
     trans = tf.gfile.FastGFile(FLAGS.trans_file).readlines()
     random.shuffle(trans)
-    for text, set_id_trans, speaker, audio_file in csv.reader(trans):
+    for text, set_id_trans, speaker, audio_file in csv.reader(trans): #sorted(csv.reader(trans), key=lambda row: len(row[0])):
         try:
             text = [VOCAB_TO_INT[c]
                     for c in list(text)] + [VOCAB_TO_INT['</s>']]
         except KeyError:
             continue
-        if (len(text) < 100 and set_id == set_id_trans and
+        if (len(text) < 250 and set_id == set_id_trans and
                 ((not FLAGS.use_train_lm) or in_fst(fst, text))):
             feat = get_features(audio_file)
             feat = feat - mean_speaker[speaker]

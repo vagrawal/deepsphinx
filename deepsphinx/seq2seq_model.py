@@ -362,7 +362,9 @@ def seq2seq_model(
         sample_training_logits.rnn_output,
         samples.sample_id,
         mask_sample,
-        average_across_batch=False)
+        average_across_batch=False,
+        average_across_timesteps=False)
+    log_sample = tf.reduce_sum(log_sample, [1]) / 100.0
     def seq_loss(true, pred):
         ret = []
         lens = []
@@ -372,11 +374,11 @@ def seq2seq_model(
             true_sen = true[i // FLAGS.beam_width].tolist()
             if VOCAB_TO_INT['</s>'] in true_sen:
                 true_sen = true_sen[:true_sen.index(VOCAB_TO_INT['</s>'])]
-            #true_sen = ''.join([VOCAB[c] for c in true_sen]).split()
+            true_sen = ''.join([VOCAB[c] for c in true_sen]).split()
             pred_sen = pred[i].tolist()
             if VOCAB_TO_INT['</s>'] in pred_sen:
                 pred_sen = pred_sen[:pred_sen.index(VOCAB_TO_INT['</s>'])]
-            #pred_sen =''.join([VOCAB[c] for c in pred_sen]).split()
+            pred_sen =''.join([VOCAB[c] for c in pred_sen]).split()
             #print(''.join([VOCAB[c] for c in true_sen]))
             #print(''.join([VOCAB[c] for c in pred_sen]))
             ret.append(float(edit_distance(true_sen, pred_sen)))
@@ -385,9 +387,11 @@ def seq2seq_model(
         lens = np.array(lens, dtype='float32')
         tf.logging.info('Sampling loss: {}'.format(np.sum(ret) / np.sum(lens)))
         ret = ret.reshape((-1, FLAGS.beam_width))
-        ret = ret - ret.mean(axis=1, keepdims=True)
-        return ret.reshape((-1))
-    cost_sample = tf.py_func(seq_loss, [target_data, samples.sample_id], 'float32', stateful=False)
+        ave_error = ret.mean(axis=1, keepdims=True)
+        ret = ret - ave_error
+        return ret.reshape((-1)), ave_error
+    cost_sample, sampling_error = tf.py_func(seq_loss, [target_data, samples.sample_id], ['float32', 'float32'], stateful=False)
+    sampling_error tf.reshape(sampling_error, [FLAGS.batch_size])
     cost_sample = tf.reshape(cost_sample, [FLAGS.batch_size * FLAGS.beam_width])
     cost_sample = tf.reduce_mean(cost_sample * log_sample)
 
@@ -414,7 +418,11 @@ def seq2seq_model(
         cost = tf.contrib.seq2seq.sequence_loss(
             training_logits,
             target_data,
-            masks)
+            masks,
+            average_across_batch=False,
+            average_across_timesteps=False)
+        cost = tf.reduce_sum(cost, [1]) * sampling_error
+        cost = tf.reduce_mean(cost, [0]) / 100.0
 
         tf.summary.scalar('cost', cost)
 
@@ -427,8 +435,8 @@ def seq2seq_model(
         optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
 
         # Gradient Clipping
-        gradients = optimizer.compute_gradients(cost)
-        gradients, variables = zip(*optimizer.compute_gradients(cost_sample))
+        #gradients = optimizer.compute_gradients(cost)
+        gradients, variables = zip(*optimizer.compute_gradients(cost_sample + 0.5 * cost))
         gradients, _ = tf.clip_by_global_norm(gradients, 1.0)
         train_op = optimizer.apply_gradients(zip(gradients, variables), step)
     return training_logits, predictions, train_op, cost, step, scores

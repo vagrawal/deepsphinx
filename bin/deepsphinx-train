@@ -148,7 +148,7 @@ def train():
         train_i = -1
 
         for epoch_i in range(1, FLAGS.num_epochs + 1):
-            if (FLAGS.checkpoint_path is not None):
+            if (epoch_i > 1 and FLAGS.checkpoint_path is not None):
                 run_eval(graph,
                          queue,
                          predictions,
@@ -193,7 +193,7 @@ def train():
                         loss, _, batch_i = sess.run(
                             [cost, train_op, step],
                             feed_dict={learning_rate_tensor: lr,
-                                       noise_std: 0.075,
+                                       noise_std: 0.05,
                                        keep_prob_tensor: FLAGS.keep_prob})
                         train_i += 1
                         #tf.logging.info('Loss: {}'.format(loss))
