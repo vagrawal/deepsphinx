@@ -122,7 +122,7 @@ def train():
             queue = tf.PaddingFIFOQueue(
                 capacity=64,
                 dtypes=['float32', 'int32', 'int32', 'int32'],
-                shapes=[[None, FLAGS.nfilt * 3 + 1], [], [None], []],
+                shapes=[[None, FLAGS.nfilt * 3], [], [None], []],
                 name='feed_queue')
             inputs, input_lengths, outputs, output_lengths = queue.dequeue_many(
                 FLAGS.batch_size)
