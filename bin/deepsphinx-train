@@ -10,6 +10,7 @@ from deepsphinx.data import read_data_queue, get_speaker_stats
 from deepsphinx.vocab import VOCAB
 from deepsphinx.utils import edit_distance, FLAGS
 from deepsphinx.flags import load_flags
+from deepsphinx.fst import next_fst, probs_fst
 try:
     import pywrapfst as fst
 except ImportError:
@@ -100,6 +101,9 @@ def train():
 
     if FLAGS.use_train_lm or FLAGS.use_inference_lm:
         lm_fst = fst.Fst.read_from_string(tf.gfile.FastGFile(FLAGS.fst_path, 'rb').read())
+        nfst = next_fst(lm_fst)
+        pfst = probs_fst(nfst, lm_fst.num_states())
+        lm_fst = (nfst, pfst)
     else:
         lm_fst = None
 
@@ -127,13 +131,13 @@ def train():
             inputs, input_lengths, outputs, output_lengths = queue.dequeue_many(
                 FLAGS.batch_size)
 
-        training_logits, predictions, train_op, cost, step, pred_scores = seq2seq_model(
+        training_logits, predictions, train_op, cost, step, pred_scores, wer_sample = seq2seq_model(
             inputs,
             outputs,
             input_lengths,
             output_lengths,
             lm_fst,
-            1.0, #keep_prob_tensor,
+            keep_prob_tensor,
             noise_std)
 
         writer = tf.summary.FileWriter(FLAGS.job_dir)
@@ -190,13 +194,13 @@ def train():
 
                         lr = FLAGS.learning_rate * pow(FLAGS.learning_rate_decay, batch_i)
 
-                        loss, _, batch_i = sess.run(
-                            [cost, train_op, step],
+                        loss, _, batch_i, bat_wer = sess.run(
+                            [cost, train_op, step, wer_sample],
                             feed_dict={learning_rate_tensor: lr,
-                                       noise_std: 0.05,
+                                       noise_std: 0.025,
                                        keep_prob_tensor: FLAGS.keep_prob})
                         train_i += 1
-                        #tf.logging.info('Loss: {}'.format(loss))
+                        tf.logging.info('Loss: {}\tWER: {}'.format(loss, bat_wer))
 
                         batch_loss += loss
 
