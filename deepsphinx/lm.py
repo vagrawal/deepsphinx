@@ -1,6 +1,6 @@
 ''' Language modelling for the tensorflow model'''
 import tensorflow as tf
-from deepsphinx.fst import fst_costs
+from deepsphinx.fst import fst_cost_single, next_fst, probs_fst
 
 class LMCellWrapper(tf.contrib.rnn.RNNCell):
     '''This class wraps a decoding cell to add LM scores'''
@@ -9,6 +9,7 @@ class LMCellWrapper(tf.contrib.rnn.RNNCell):
         super(LMCellWrapper, self).__init__(_reuse=reuse)
         self.dec_cell = dec_cell
         self.fst = fst
+        self.nfst, self.pfst = fst
         self._output_size = dec_cell.output_size
         self.max_states = max_states
         # LSTM state, FST states and number of FST states
@@ -34,20 +35,17 @@ class LMCellWrapper(tf.contrib.rnn.RNNCell):
 
         def fst_costs_env(states, probs, num, inp):
             '''Python function'''
-            return fst_costs(states, probs, num, inp, self.fst, self.max_states)
+            return fst_cost_single(states, probs, num, inp, self.nfst, self.pfst, self.max_states)
+        final_func = lambda x: tf.py_func(fst_costs_env, x, [tf.int32, tf.float32, tf.int32, tf.float32], stateful=False)
 
-        func_appl = tf.py_func(fst_costs_env,
-                               [fst_states, state_probs, num_fst_states,
-                                tf.argmax(inputs, 1)],
-                               [tf.int32, tf.float32, tf.int32, tf.float32],
-                               stateful=False)
+        func_appl = tf.map_fn(final_func, [fst_states, state_probs, num_fst_states, tf.argmax(inputs, 1)],
+                [tf.int32, tf.float32, tf.int32, tf.float32], parallel_iterations=16)
         next_state, next_state_probs, next_num_states, lm_scores = func_appl
         next_state.set_shape(fst_states.shape)
         next_num_states.set_shape(num_fst_states.shape)
         next_state_probs.set_shape(state_probs.shape)
         lm_scores.set_shape(cell_out.shape)
-        fin_score = tf.nn.log_softmax(
-            cell_out) + 0.5 * tf.nn.log_softmax(lm_scores)
+        fin_score = tf.nn.log_softmax(cell_out) + tf.nn.log_softmax(lm_scores)
         return fin_score, (cell_state, next_state, next_state_probs, next_num_states)
 
     def zero_state(self, batch_size, dtype):
