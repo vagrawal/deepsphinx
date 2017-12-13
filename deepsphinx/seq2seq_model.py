@@ -365,33 +365,24 @@ def seq2seq_model(
         average_across_batch=False,
         average_across_timesteps=False)
     log_sample = tf.reduce_sum(log_sample, [1]) / 100.0
-    def seq_loss(true, pred):
-        ret = []
-        lens = []
-        #print('\n'.join([''.join([VOCAB[c] for c in row]) for row in true]))
-        #print('\n'.join([''.join([VOCAB[c] for c in row]) for row in pred]))
-        for i in range(pred.shape[0]):
-            true_sen = true[i // FLAGS.beam_width].tolist()
-            if VOCAB_TO_INT['</s>'] in true_sen:
-                true_sen = true_sen[:true_sen.index(VOCAB_TO_INT['</s>'])]
-            true_sen = ''.join([VOCAB[c] for c in true_sen]).split()
-            pred_sen = pred[i].tolist()
-            if VOCAB_TO_INT['</s>'] in pred_sen:
-                pred_sen = pred_sen[:pred_sen.index(VOCAB_TO_INT['</s>'])]
-            pred_sen =''.join([VOCAB[c] for c in pred_sen]).split()
-            #print(''.join([VOCAB[c] for c in true_sen]))
-            #print(''.join([VOCAB[c] for c in pred_sen]))
-            ret.append(float(edit_distance(true_sen, pred_sen)))
-            lens.append(float(len(true_sen)))
-        ret = np.array(ret, dtype='float32')
-        lens = np.array(lens, dtype='float32')
-        tf.logging.info('Sampling loss: {}'.format(np.sum(ret) / np.sum(lens)))
-        ret = ret.reshape((-1, FLAGS.beam_width))
-        ave_error = ret.mean(axis=1, keepdims=True)
-        ret = ret - ave_error
-        return ret.reshape((-1)), ave_error
-    cost_sample, sampling_error = tf.py_func(seq_loss, [target_data, samples.sample_id], ['float32', 'float32'], stateful=False)
-    sampling_error tf.reshape(sampling_error, [FLAGS.batch_size])
+    def seq_loss(true_sen, pred_sen):
+        true_sen = list(true_sen)
+        pred_sen = list(pred_sen)
+        if VOCAB_TO_INT['</s>'] in true_sen:
+            true_sen = true_sen[:true_sen.index(VOCAB_TO_INT['</s>'])]
+        true_sen = ''.join([VOCAB[c] for c in true_sen]).split()
+        if VOCAB_TO_INT['</s>'] in pred_sen:
+            pred_sen = pred_sen[:pred_sen.index(VOCAB_TO_INT['</s>'])]
+        #print(''.join([VOCAB[c] for c in pred_sen]))
+        pred_sen =''.join([VOCAB[c] for c in pred_sen]).split()
+        return np.float32(edit_distance(true_sen, pred_sen)), np.float32(len(true_sen))
+    wer_fn = lambda x: tf.py_func(seq_loss, x, ['float32', 'float32'], stateful=False)
+    targets = tf.contrib.seq2seq.tile_batch(target_data, FLAGS.beam_width)
+    cost_sample, len_real = tf.map_fn(wer_fn, [targets, samples.sample_id], ['float32', 'float32'], parallel_iterations=16)
+    cost_sample = tf.reshape(cost_sample, [FLAGS.batch_size, FLAGS.beam_width])
+    tot_wer = tf.reduce_sum(cost_sample) / tf.reduce_sum(len_real)
+    sampling_error = tf.reduce_mean(cost_sample, 1, keep_dims=True)
+    cost_sample -= sampling_error
     cost_sample = tf.reshape(cost_sample, [FLAGS.batch_size * FLAGS.beam_width])
     cost_sample = tf.reduce_mean(cost_sample * log_sample)
 
@@ -421,22 +412,23 @@ def seq2seq_model(
             masks,
             average_across_batch=False,
             average_across_timesteps=False)
-        cost = tf.reduce_sum(cost, [1]) * sampling_error
-        cost = tf.reduce_mean(cost, [0]) / 100.0
+        cost = tf.reduce_sum(cost, [1])
+        cost_comp = tf.reduce_mean(cost * sampling_error,  [0]) / 100.0
+        cost = tf.reduce_mean(cost, [0]) / 100
 
         tf.summary.scalar('cost', cost)
 
         step = tf.train.get_or_create_global_step()
 
         vars = tf.trainable_variables()
-        lossL2 = tf.add_n([ tf.nn.l2_loss(v) for v in vars ]) * 0.00000001
+        lossL2 = tf.add_n([ tf.nn.l2_loss(v) for v in vars ]) * 0.0000001
 
         # Optimizer
         optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
 
         # Gradient Clipping
         #gradients = optimizer.compute_gradients(cost)
-        gradients, variables = zip(*optimizer.compute_gradients(cost_sample + 0.5 * cost))
+        gradients, variables = zip(*optimizer.compute_gradients(cost_sample + cost_comp + lossL2))
         gradients, _ = tf.clip_by_global_norm(gradients, 1.0)
         train_op = optimizer.apply_gradients(zip(gradients, variables), step)
-    return training_logits, predictions, train_op, cost, step, scores
+    return training_logits, predictions, train_op, cost, step, scores, tot_wer
