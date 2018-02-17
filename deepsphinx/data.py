@@ -101,8 +101,11 @@ def read_data_thread(
     random.shuffle(trans)
     for text, set_id_trans, speaker, audio_file in csv.reader(trans): #sorted(csv.reader(trans), key=lambda row: len(row[0])):
         try:
-            text = [VOCAB_TO_INT[c]
-                    for c in list(text)] + [VOCAB_TO_INT[' '], VOCAB_TO_INT['</s>']]
+            text = [VOCAB_TO_INT[c] for c in list(text)]
+            # A space is required after the sentence due to the way FST is set up
+            if (text[-1] != VOCAB_TO_INT[' ']):
+                text.append(VOCAB_TO_INT[' '])
+            text.append(VOCAB_TO_INT['</s>'])
         except KeyError:
             continue
         if (len(text) < FLAGS.max_output_len and set_id == set_id_trans and
