@@ -95,11 +95,11 @@ def read_data_thread(
     trans = tf.gfile.FastGFile(FLAGS.trans_file).readlines()
     random.shuffle(trans)
     for text, set_id_trans, speaker, audio_file in csv.reader(trans):
-        try:
-            text = [VOCAB_TO_INT[c]
-                    for c in list(text)] + [VOCAB_TO_INT['</s>']]
-        except KeyError:
-            continue
+        text = [VOCAB_TO_INT[c] for c in list(text)]
+        # A space is required after the sentence due to the way FST is set up
+        if (text[-1] != VOCAB_TO_INT[' ']):
+            text.append(VOCAB_TO_INT[' '])
+        text.append(VOCAB_TO_INT['</s>'])
         if (set_id == set_id_trans and
                 ((not FLAGS.use_train_lm) or in_fst(fst, text))):
             feat = get_features(audio_file)
