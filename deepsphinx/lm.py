@@ -39,7 +39,7 @@ class LMCellWrapper(tf.contrib.rnn.RNNCell):
         final_func = lambda x: tf.py_func(fst_costs_env, x, [tf.int32, tf.float32, tf.int32, tf.float32], stateful=False)
 
         func_appl = tf.map_fn(final_func, [fst_states, state_probs, num_fst_states, tf.argmax(inputs, 1)],
-                [tf.int32, tf.float32, tf.int32, tf.float32], parallel_iterations=16)
+                [tf.int32, tf.float32, tf.int32, tf.float32], parallel_iterations=32)
         next_state, next_state_probs, next_num_states, lm_scores = func_appl
         next_state.set_shape(fst_states.shape)
         next_num_states.set_shape(num_fst_states.shape)

@@ -145,7 +145,7 @@ def get_dec_cell(
         output_attention=True)
 
     if use_lm:
-        dec_cell = LMCellWrapper(dec_cell, fst, 5)
+        dec_cell = LMCellWrapper(dec_cell, fst, 3)
 
     return dec_cell
 
@@ -342,7 +342,7 @@ def seq2seq_model(
             enc_lengths,
             fst,
             keep_prob,
-            0.0)
+            noise_std)
     with tf.variable_scope('decode', reuse=True):
         sample_training_logits = training_decoding_layer(
             samples.sample_id,
@@ -378,7 +378,7 @@ def seq2seq_model(
         return np.float32(edit_distance(true_sen, pred_sen)), np.float32(len(true_sen))
     wer_fn = lambda x: tf.py_func(seq_loss, x, ['float32', 'float32'], stateful=False)
     targets = tf.contrib.seq2seq.tile_batch(target_data, FLAGS.beam_width)
-    cost_sample, len_real = tf.map_fn(wer_fn, [targets, samples.sample_id], ['float32', 'float32'], parallel_iterations=16)
+    cost_sample, len_real = tf.map_fn(wer_fn, [targets, samples.sample_id], ['float32', 'float32'], parallel_iterations=32)
     cost_sample = tf.reshape(cost_sample, [FLAGS.batch_size, FLAGS.beam_width])
     tot_wer = tf.reduce_sum(cost_sample) / tf.reduce_sum(len_real)
     sampling_error = tf.reduce_mean(cost_sample, 1, keep_dims=True)
@@ -428,7 +428,7 @@ def seq2seq_model(
 
         # Gradient Clipping
         #gradients = optimizer.compute_gradients(cost)
-        gradients, variables = zip(*optimizer.compute_gradients(cost_sample + cost_comp + lossL2))
+        gradients, variables = zip(*optimizer.compute_gradients(cost_sample + 0.2 * cost_comp + lossL2))
         gradients, _ = tf.clip_by_global_norm(gradients, 1.0)
         train_op = optimizer.apply_gradients(zip(gradients, variables), step)
     return training_logits, predictions, train_op, cost, step, scores, tot_wer
