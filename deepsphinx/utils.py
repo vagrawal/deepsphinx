@@ -1,6 +1,7 @@
 '''Common utilities'''
 import tensorflow as tf
 import numpy as np
+from deepsphinx.flags import FLAGS
 
 # https://github.com/zszyellow/WER-in-python/blob/master/wer.py
 def edit_distance(ref, hyp):
@@ -27,5 +28,3 @@ def edit_distance(ref, hyp):
                 delete = edit_dp[i - 1][j] + 1
                 edit_dp[i][j] = min(substitute, insert, delete)
     return edit_dp[len(ref)][len(hyp)]
-
-FLAGS = tf.app.flags.FLAGS

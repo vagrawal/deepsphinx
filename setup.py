@@ -9,7 +9,7 @@ setup(
     description='Trainer',
     # Replace with tensorflow-gpu if using GPU
     install_requires=['python_speech_features',
-                      'tensorflow==1.3.0',
+                      'tensorflow==1.4.1',
                       'scipy',
                       'pysoundfile'],
     extras_require = {

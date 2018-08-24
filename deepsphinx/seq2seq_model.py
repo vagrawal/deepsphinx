@@ -428,7 +428,7 @@ def seq2seq_model(
 
         # Gradient Clipping
         #gradients = optimizer.compute_gradients(cost)
-        gradients, variables = zip(*optimizer.compute_gradients(cost_sample + 0.2 * cost_comp + lossL2))
+        gradients, variables = zip(*optimizer.compute_gradients(cost + lossL2))
         gradients, _ = tf.clip_by_global_norm(gradients, 1.0)
         train_op = optimizer.apply_gradients(zip(gradients, variables), step)
     return training_logits, predictions, train_op, cost, step, scores, tot_wer

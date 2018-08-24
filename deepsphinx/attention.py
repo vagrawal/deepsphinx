@@ -47,13 +47,13 @@ class BahdanauAttentionCutoff(tf.contrib.seq2seq.BahdanauAttention.__base__):
             `memory_sequence_length` is not None.
           name: Name to use when creating ops.
         '''
-        def probability_fn_cutoff(scores, previous_alignments):
+        def probability_fn_cutoff(scores, state):
             '''Only allow characters near previous alignments means and make all
             zero'''
             ran = tf.range(tf.to_float(
-                tf.shape(previous_alignments)[1]), dtype=tf.float32)
-            mean = (tf.reduce_sum(ran * previous_alignments, axis=1) /
-                    tf.reduce_sum(previous_alignments, axis=1))
+                tf.shape(state)[1]), dtype=tf.float32)
+            mean = (tf.reduce_sum(ran * state, axis=1) /
+                    tf.reduce_sum(state, axis=1))
             mask = tf.logical_and(
                 ran > mean - FLAGS.cutoff_range,
                 ran < mean + FLAGS.cutoff_range)
@@ -93,12 +93,12 @@ class BahdanauAttentionCutoff(tf.contrib.seq2seq.BahdanauAttention.__base__):
                 'attention_b', [self._num_units], dtype=dtype,
                 initializer=tf.zeros_initializer())
 
-    def __call__(self, query, previous_alignments):
+    def __call__(self, query, state):
         '''Score the query based on the keys and values.
         Args:
           query: Tensor of dtype matching `self.values` and shape
             `[batch_size, query_depth]`.
-          previous_alignments: Tensor of dtype matching `self.values` and shape
+          state: Tensor of dtype matching `self.values` and shape
             `[batch_size, alignments_size]`
             (`alignments_size` is memory's `max_time`).
         Returns:
@@ -114,7 +114,7 @@ class BahdanauAttentionCutoff(tf.contrib.seq2seq.BahdanauAttention.__base__):
             processed_query = tf.expand_dims(processed_query, 1)
             if FLAGS.use_conv_feat_att:
                 conv_feat = tf.nn.conv1d(
-                        tf.expand_dims(previous_alignments, 2),
+                        tf.expand_dims(state, 2),
                         self.conv_filt, 1, 'SAME')
             keys = self._keys
             if self._normalize:
@@ -132,8 +132,9 @@ class BahdanauAttentionCutoff(tf.contrib.seq2seq.BahdanauAttention.__base__):
                                       [2])
 
 
-        alignments = self._probability_fn(score, previous_alignments)
-        return alignments
+        alignments = self._probability_fn(score, state)
+        next_state = alignments
+        return alignments, next_state
 
     def initial_alignments(self, batch_size, dtype):
         '''Returns all the alignment saturated in first block'''

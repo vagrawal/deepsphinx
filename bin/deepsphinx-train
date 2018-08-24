@@ -9,7 +9,7 @@ from deepsphinx.seq2seq_model import seq2seq_model
 from deepsphinx.data import read_data_queue, get_speaker_stats
 from deepsphinx.vocab import VOCAB
 from deepsphinx.utils import edit_distance, FLAGS
-from deepsphinx.flags import load_flags
+from deepsphinx.flags import load_flags, FLAGS
 from deepsphinx.fst import next_fst, probs_fst
 try:
     import pywrapfst as fst
@@ -194,15 +194,20 @@ def train():
 
                         lr = FLAGS.learning_rate * pow(FLAGS.learning_rate_decay, batch_i)
 
-                        loss, bat_wer, _, batch_i = sess.run(
-                            [cost, wer_sample, train_op, step],
+                        #loss, bat_wer, _, batch_i = sess.run(
+                        #    [cost, wer_sample, train_op, step],
+                        loss, _, batch_i = sess.run(
+                            [cost, train_op, step],
                             feed_dict={learning_rate_tensor: lr,
-                                       noise_std: 0.025,
+                                       noise_std: 0.075,
                                        keep_prob_tensor: FLAGS.keep_prob})
+                        bat_wer = 0
                         train_i += 1
-                        tf.logging.info('Loss: {}\tWER: {}'.format(loss, bat_wer))
+                        # tf.logging.info('Loss: {}\tWER: {}'.format(loss, bat_wer))
 
                         batch_loss += loss
+                        if (train_i % 500) == 0:
+                            FLAGS.checkpoint_path = saver.save(sess, checkpoint + 'batch', step)
 
                         if (train_i + 1) % FLAGS.display_step == 0:
 
@@ -273,7 +278,7 @@ def train():
 if __name__ == '__main__':
     tf.logging.set_verbosity(tf.logging.INFO)
     load_flags()
-    unparsed = tf.flags.FLAGS._parse_flags()
+    unparsed = FLAGS._parse_flags()
     if unparsed:
         tf.logging.info('Unparsed flags: {}'.format(unparsed))
     train()
