@@ -10,7 +10,7 @@ from deepsphinx.fst import in_fst
 import soundfile as sf
 import pickle
 import csv
-from joblib import Memory
+#from joblib import Memory
 
 def get_features(audio_file):
     '''Get features from a file'''
